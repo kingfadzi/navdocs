@@ -1,0 +1,82 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+title Data & Migration View – OpenText PPM (lineage • retention • ETL)
+
+' === Data Producers / Consumers ===
+System_Ext(Workday, "Workday", "HR/Resource master (attributes feed)")
+System_Ext(SAPGL, "SAP GL Galaxy", "Finance actuals (files)")
+System_Ext(Jira, "Jira", "Delivery data (bi-dir planned)")
+System_Ext(Excel, "Excel / Ad-hoc", "Shadow ecosystem (extracts)")
+
+System_Ext(Tableau, "Tableau", "Analytics / BI")
+System_Ext(Qlik, "QlikView", "Analytics / BI")
+System_Ext(Apptio, "Apptio", "ITFM / TBM")
+System_Ext(SAPFG, "SAP Field Glass", "External consumer")
+System_Ext(PPMC, "PPMC (custom UI)", "Reporting UI")
+
+' === PPM Transactional Domain ===
+Enterprise_Boundary(ppm, "PPM Transactional Domain") {
+  Container(PPMApp, "OpenText PPM App", "Java", "Transactional application tier")
+  ContainerDb(OracleDB, "Oracle 19c (PPM)", "Oracle", "Transactional schema (3NF), 10-year retention, no archiving")
+  Component(XLI, "XLI Purging Tool", "Utility", "Purge legacy data (planned/ongoing)")
+}
+
+Rel(PPMApp, OracleDB, "JDBC/SQL • real-time transactions", "Bidirectional")
+Rel(XLI, OracleDB, "Purge jobs • scheduled (TBC)", "Outbound")
+
+' === ODS / Reporting Domain ===
+Enterprise_Boundary(ods, "ODS / Reporting Domain") {
+  Container(SSIS, "SSIS ETL", "SQL Server Integration Services", "Extract-transform-load pipeline")
+  ContainerDb(ODSDB, "SQL Server ODS", "SQL Server", "Reporting-oriented model (TBC: star/flattened), high tech debt")
+  Component(DQ, "Data Quality / Reconciliation", "Process", "Checks & reconciliations (TBC)")
+}
+
+' === Inbound to PPM (reference lineage) ===
+Rel(Workday, PPMApp, "API/Flat-file • TBC (daily/near-RT)", "Inbound")
+Rel(SAPGL, PPMApp, "File (CSV/XML) • TBC (daily)", "Inbound")
+Rel(Jira, PPMApp, "API • bi-directional (planned)", "Bi-directional")
+
+' === Oracle -> ODS lineage ===
+Rel(OracleDB, SSIS, "Extract (JDBC/ODBC) • batch (hours)", "Outbound")
+Rel(SSIS, DQ, "Stage • validate • transform", "Flow")
+Rel(DQ, ODSDB, "Load curated data • batch (hours)", "Inbound")
+
+' === ODS -> Consumers ===
+Rel(ODSDB, Tableau, "DB connector • scheduled refresh (TBC)", "Outbound")
+Rel(ODSDB, Qlik, "DB connector • scheduled refresh (TBC)", "Outbound")
+Rel(ODSDB, Apptio, "API/File • weekly/monthly (TBC)", "Outbound")
+Rel(ODSDB, SAPFG, "API/File • daily (TBC)", "Outbound")
+Rel(ODSDB, PPMC, "Views/API • TBC", "Outbound")
+
+' === Shadow Exports ===
+Rel(ODSDB, Excel, "Exports/CSV • ad-hoc / scheduled (TBC)", "Outbound")
+
+' === Governance / Data Lifecycle Annotations ===
+' (Use Notes to highlight retention, archiving, and risks)
+UpdateElementStyle(OracleDB, $bgColor="Cornsilk")
+UpdateElementStyle(ODSDB, $bgColor="Red", $fontColor="White")
+UpdateElementStyle(SSIS, $bgColor="Red", $fontColor="White")
+UpdateElementStyle(DQ, $bgColor="HoneyDew")
+UpdateElementStyle(XLI, $bgColor="LightYellow")
+UpdateElementStyle(Excel, $bgColor="Red", $fontColor="White")
+
+' Notes
+AddRelTag("risk", $lineColor="Tomato", $textColor="Tomato")
+
+' Risk emphasis (optional, visual only)
+Rel(OracleDB, ODSDB, "Conceptual lineage (performance risk, hours-long ETL)", "risk")
+
+' Inline policy hints (as notes)
+' Retention / archiving gap
+Rel_D(OracleDB, OracleDB, "No archiving • 10y retention • large-table growth (performance impact)", "risk")
+
+' ETL complexity
+Rel_D(SSIS, ODSDB, "Complex SSIS packages • few SMEs • fragile (TBC)", "risk")
+
+' Excel shadow ecosystem
+Rel_D(ODSDB, Excel, "Uncontrolled extracts • multiple versions of truth (TBC)", "risk")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,79 @@
+@startuml
+title DevOps Release Process – Current State (OpenText PPM)
+
+' Use activity diagram with swimlanes (partitions)
+skinparam activity {
+  ArrowColor #444
+  StartColor #99ccff
+  EndColor #ffcccc
+  BackgroundColor #f8f8f8
+  DiamondBackgroundColor #fff2cc
+  BorderColor #999
+}
+skinparam shadowing false
+skinparam defaultTextAlignment left
+
+partition "Developer" {
+  start
+  :Change request / Jira ticket created;
+  :Make config/workflow/report changes locally;
+  :Export PPM artefacts (proprietary) OR\nmodify custom JSP/HTML/JS;
+  :Commit to Git (optional / partial);
+}
+
+partition "Repo / Artefacts" {
+  :Artefacts stored in Git (machine-generated) OR\nshared drive (ZIP/WAR);
+  note right
+    Not human-readable config.
+    Limited code review/testing.
+  end note
+}
+
+partition "Release Engineer" {
+  :Prepare deployment bundle (WAR/ZIP);
+  if ("Change control approval?") then (Yes)
+    :Approved window obtained;
+  else (No)
+    :Reschedule / wait;
+    stop
+  endif
+}
+
+partition "PPM App Servers" {
+  :SSH/RDP to server(s);
+  :Stop node / take out of LB;
+  :Unpack WAR, drop custom files;
+  :Repack/replace WAR;
+  :Start node / return to LB;
+  note right
+    Manual steps, error-prone.
+    No automated validation.
+  end note
+}
+
+partition "Stage/UAT" {
+  :Deploy to Stage/UAT;
+  :Ad-hoc functional checks;
+  if ("Issues found?") then (Yes)
+    :Manual rollback (revert WAR);
+    stop
+  else (No)
+    :User sign-off (UAT);
+  endif
+}
+
+partition "Production" {
+  :Freeze window starts;
+  :Repeat manual deploy steps on each node;
+  :Restart node(s) sequentially;
+  :Smoke tests (manual);
+  if ("Post-deploy OK?") then (Yes)
+    :Mark change as complete;
+  else (No)
+    :Manual rollback (replace prior WAR);
+    :Vendor support if required;
+  endif
+  stop
+}
+
+@enduml

@@ -1,0 +1,93 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+title Component Diagram for OpenText PPM Platform (C4-style)
+
+' --- Define External Systems ---
+System_Ext(R_Tableau, "Tableau", "Analytics/BI consumer")
+System_Ext(R_PPMC, "PPMC (custom UI)", "Reporting consumer UI")
+System_Ext(R_Qlik, "QlikView", "Analytics/BI consumer")
+System_Ext(R_Excel, "Excel / ad-hoc", "General data consumer")
+
+
+' --- Define the System Boundary and Containers ---
+Enterprise_Boundary(c1, "OpenText PPM Platform") {
+
+    Container(A_PPM, "OpenText PPM App Cluster", "Java", "Hosts all the PPM modules and business logic.") {
+        ' --- Define Components inside the App Cluster Container ---
+        Component(M_Portfolio, "Portfolio Management", "Module")
+        Component(M_Demand, "Demand / Proposals", "Module")
+        Component(M_Program, "Program Management", "Module")
+        Component(M_Project, "Project Management", "Module")
+        Component(M_Financials, "Financial Management", "Module")
+        Component(M_Benefits, "Benefits Management", "Module")
+        Component(M_Time, "Time Management", "Module")
+        Component(M_Resource, "Resource / Capacity", "Module")
+        Component(M_RiskIssue, "Risk / Issue / Change", "Module")
+        Component(M_Reporting, "Native Reporting", "Module")
+    }
+
+    ContainerDb(A_DB, "Transactional DB", "Oracle 19c", "Stores core PPM transactional data.")
+}
+
+System_Boundary(dataWarehouse, "Data Warehouse") {
+    Container(A_ETL, "ETL Jobs", "Custom Scripts", "Extracts data from the transactional DB and loads it into the ODS.")
+    ContainerDb(A_ODS, "Operational Data Store", "SQL Server", "Provides data for analytics and reporting.")
+}
+
+' --- Define Business Capabilities ---
+rectangle "Portfolio hierarchy" as C_Portfolio
+rectangle "Pipeline / proposals" as C_Pipeline
+rectangle "Program management" as C_Program
+rectangle "Project execution" as C_Project
+rectangle "Budgets" as C_Budget
+rectangle "Financial benefits" as C_Benefits
+rectangle "Non-resource forecasts" as C_Forecast
+rectangle "Time recording" as C_Time
+rectangle "Workplan / outcomes" as C_Workplan
+rectangle "RAIDs" as C_RAID
+rectangle "RAG status reporting" as C_RAG
+rectangle "Automated IGF packs" as C_IGF
+rectangle "Benefit forms" as C_BenefitForms
+rectangle "Change control" as C_Change
+rectangle "Lessons learnt" as C_Lessons
+rectangle "Portfolio risks" as C_PortfolioRisk
+rectangle "Teams / capacity management" as C_Capacity
+
+
+' --- Relationships ---
+
+
+' Capability -> Module mappings
+Rel(C_Portfolio, M_Portfolio, "Realized by")
+Rel(C_Pipeline, M_Demand, "Realized by")
+Rel(C_Program, M_Program, "Realized by")
+Rel(C_Project, M_Project, "Realized by")
+Rel(C_Workplan, M_Project, "Realized by")
+Rel(C_Budget, M_Financials, "Realized by")
+Rel(C_Forecast, M_Financials, "Realized by")
+Rel(C_Benefits, M_Benefits, "Realized by")
+Rel(C_Time, M_Time, "Realized by")
+Rel(C_Capacity, M_Resource, "Realized by")
+Rel(C_RAID, M_RiskIssue, "Realized by")
+Rel(C_RAG, M_Project, "Realized by")
+Rel(C_IGF, M_Reporting, "Realized by")
+Rel(C_BenefitForms, M_Benefits, "Realized by")
+Rel(C_Change, M_RiskIssue, "Realized by")
+Rel(C_Lessons, M_Project, "Realized by")
+Rel(C_PortfolioRisk, M_Portfolio, "Realized by")
+
+' Internal relationships
+Rel(A_PPM, A_DB, "Reads from and writes to", "JDBC")
+Rel(A_DB, A_ETL, "Is read by", "SQL")
+Rel(A_ETL, A_ODS, "Loads data into", "SQL")
+
+' ODS to Reporting
+Rel(A_ODS, R_Tableau, "Provides data to")
+Rel(A_ODS, R_PPMC, "Provides data to")
+Rel(A_ODS, R_Qlik, "Provides data to")
+Rel(A_ODS, R_Excel, "Provides data to")
+
+
+@enduml

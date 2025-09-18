@@ -1,0 +1,69 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_LEFT_RIGHT()
+title Integration & Interface View – OpenText PPM (protocol • frequency)
+
+' --- External / Peer Systems (Upstream) ---
+System_Ext(Workday, "Workday", "HR / Resource master")
+System_Ext(SAPGL, "SAP GL Galaxy", "Finance actuals")
+System_Ext(SharePoint, "SharePoint", "Docs / collaboration")
+System_Ext(Hood, "Hood", "Upstream system")
+System_Ext(Parker, "Parker", "Upstream system")
+System_Ext(ORAC, "ORAC", "Upstream system")
+System_Ext(LCT, "LCT", "Upstream system")
+System_Ext(Jira, "Jira", "Agile project management")
+
+' --- Downstream Consumers (from ODS) ---
+System_Ext(SAPFG, "SAP Field Glass", "External consumer")
+System_Ext(Tableau, "Tableau", "Analytics / BI")
+System_Ext(Qlik, "QlikView", "Analytics / BI")
+System_Ext(Apptio, "Apptio", "ITFM / TBM")
+System_Ext(Hypercue, "Hypercue", "Reporting consumer")
+
+' --- PPM Boundary ---
+Enterprise_Boundary(ppm, "OpenText PPM Platform") {
+    Container(PPMApp, "OpenText PPM App", "Java", "PPM application tier")
+    ContainerDb(OracleDB, "Oracle 19c", "Oracle", "Transactional DB (system of record)")
+}
+
+' --- ODS Subsystem Boundary ---
+Enterprise_Boundary(ods, "ODS Subsystem") {
+    ContainerDb(ODSDB, "SQL Server ODS", "SQL Server", "Operational data store for reporting")
+    Container(SSIS, "SSIS ETL", "SQL Server Integration Services", "Extract-transform-load jobs")
+}
+
+' ===========================
+' Upstream → PPM connections
+' ===========================
+Rel(Workday,   PPMApp, "API / Flat-file • TBC (daily / near-real-time)", "Inbound")
+Rel(SAPGL,     PPMApp, "File (CSV/XML) • TBC (daily)",                  "Inbound")
+Rel(Hood,      PPMApp, "TBC • TBC,",                                     "Inbound")
+Rel(Parker,    PPMApp, "TBC • TBC",                                     "Inbound")
+Rel(ORAC,      PPMApp, "TBC • TBC",                                     "Inbound")
+Rel(LCT,       PPMApp, "TBC • TBC",                                     "Inbound")
+BiRel(Jira,    PPMApp, "API / REST • TBC (real-time sync)",            "Bidirectional")
+Rel(PPMApp,  SharePoint, "API / File • TBC (on-demand)",                "Outbound")
+
+' ===========================
+' PPM <-> Oracle DB
+' ===========================
+Rel(PPMApp, OracleDB, "JDBC / SQL • Real-time transactions", "Bidirectional")
+
+' ===========================
+' Oracle → ODS (ETL path)
+' ===========================
+Rel(OracleDB, SSIS, "JDBC/ODBC Extract • Batch (hours)", "Outbound")
+Rel(SSIS, ODSDB, "ETL Load • Batch (hours)", "Inbound")
+
+' ===================================
+' ODS → Downstream consumer connections
+' ===================================
+Rel(ODSDB, SAPFG,   "API / File • TBC (daily)",             "Outbound")
+Rel(ODSDB, Tableau, "DB connector • TBC (scheduled refresh)","Outbound")
+Rel(ODSDB, Qlik,    "DB connector • TBC (scheduled refresh)","Outbound")
+Rel(ODSDB, Apptio,  "API / File • TBC (weekly / monthly)",  "Outbound")
+Rel(ODSDB, Hypercue,"API / File • TBC",                      "Outbound")
+
+
+@enduml
