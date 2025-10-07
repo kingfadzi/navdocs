@@ -236,23 +236,36 @@ def baseline_repave(bom_file):
     # Validate BOM first (mirrors CI pipeline)
     validate_bom_before_deploy(bom_file)
 
-    print("=" * 60)
-    print("STAGE 2: BASELINE REPAVE")
-    print("=" * 60)
-    print(f"BOM: {bom_file}")
-    print()
-
     # Get paths
     root = Path(__file__).parent.parent
 
     # Load BOM
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
-    source_env = bom['source_environment']
-    target_env = bom['target_environment']
 
-    print(f"Source: {source_env}")
-    print(f"Target: {target_env}")
+    # Runtime check: Profile must match deployment type
+    if 'baseline' not in profile_name.lower():
+        print("=" * 60)
+        print("ERROR: Profile Mismatch")
+        print("=" * 60)
+        print(f"baseline-repave command requires a baseline profile")
+        print(f"Found profile: {profile_name}")
+        print()
+        print(f"Use: python3 tools/deploy.py functional-release --bom {bom_file}")
+        print("=" * 60)
+        sys.exit(1)
+
+    print("=" * 60)
+    print("STAGE 2: BASELINE REPAVE")
+    print("=" * 60)
+    print(f"BOM: {bom_file}")
+    print()
+
+    source_server = bom['source_server']
+    target_server = bom['target_server']
+
+    print(f"Source: {source_server}")
+    print(f"Target: {target_server}")
     print(f"Profile: {profile_name}")
     print()
 
@@ -260,8 +273,8 @@ def baseline_repave(bom_file):
     config = load_yaml(root / "config" / "deployment-config.yaml")
     profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
 
-    source_url = config['environments'][source_env]['url']
-    target_url = config['environments'][target_env]['url']
+    source_url = config['servers'][source_server]['url']
+    target_url = config['servers'][target_server]['url']
     extract_script = config['kmigrator']['extract_script']
     import_script = config['kmigrator']['import_script']
 
@@ -319,31 +332,44 @@ def functional_release(bom_file):
     # Validate BOM first (mirrors CI pipeline)
     validate_bom_before_deploy(bom_file)
 
-    print("=" * 60)
-    print("STAGE 2: FUNCTIONAL RELEASE")
-    print("=" * 60)
-    print(f"BOM: {bom_file}")
-    print()
-
     # Get paths
     root = Path(__file__).parent.parent
 
     # Load BOM
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
-    source_env = bom['source_environment']
-    target_env = bom['target_environment']
 
-    print(f"Source: {source_env}")
-    print(f"Target: {target_env}")
+    # Runtime check: Profile must match deployment type
+    if 'functional' not in profile_name.lower():
+        print("=" * 60)
+        print("ERROR: Profile Mismatch")
+        print("=" * 60)
+        print(f"functional-release command requires a functional profile")
+        print(f"Found profile: {profile_name}")
+        print()
+        print(f"Use: python3 tools/deploy.py baseline-repave --bom {bom_file}")
+        print("=" * 60)
+        sys.exit(1)
+
+    print("=" * 60)
+    print("STAGE 2: FUNCTIONAL RELEASE")
+    print("=" * 60)
+    print(f"BOM: {bom_file}")
+    print()
+
+    source_server = bom['source_server']
+    target_server = bom['target_server']
+
+    print(f"Source: {source_server}")
+    print(f"Target: {target_server}")
     print(f"Profile: {profile_name}")
     print()
 
     # Load config
     config = load_yaml(root / "config" / "deployment-config.yaml")
 
-    source_url = config['environments'][source_env]['url']
-    target_url = config['environments'][target_env]['url']
+    source_url = config['servers'][source_server]['url']
+    target_url = config['servers'][target_server]['url']
     extract_script = config['kmigrator']['extract_script']
     import_script = config['kmigrator']['import_script']
 
@@ -423,15 +449,15 @@ def rollback(bom_file):
         print("Error: No rollback_artifact specified in BOM")
         sys.exit(1)
 
-    target_env = bom['target_environment']
+    target_server = bom['target_server']
 
-    print(f"Target: {target_env}")
+    print(f"Target: {target_server}")
     print(f"Rollback artifact: {rollback_artifact}")
     print()
 
     # Load config
     config = load_yaml(root / "config" / "deployment-config.yaml")
-    target_url = config['environments'][target_env]['url']
+    target_url = config['servers'][target_server]['url']
     import_script = config['kmigrator']['import_script']
 
     # Download artifact from Nexus

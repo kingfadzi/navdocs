@@ -1,0 +1,84 @@
+# Deployment Governance Rules
+# Defines critical validation rules for BOM deployments
+# Philosophy: Prevent production outages, data leaks, and security issues
+
+version: "1.0.0"
+
+# ==============================================================================
+# CRITICAL RULES (Day 1)
+# ==============================================================================
+
+# Prevent invalid deployment flow
+prohibited_deployment_paths:
+  enabled: true
+  severity: blocking
+  paths:
+    # Reverse flow - prevents data leaks from higher to lower environments
+    - source: prod
+      target: [dev, test, uat, staging]
+      reason: "Cannot copy production data to lower environments"
+
+    - source: staging
+      target: [dev, test, uat]
+      reason: "Cannot copy staging data to lower environments"
+
+    # Lateral flow - prevents backwards/sideways deployment
+    - source: test
+      target: [dev]
+      reason: "Cannot reverse deployment flow"
+
+    - source: uat
+      target: [dev]
+      reason: "Cannot reverse deployment flow"
+
+# Production deployments require rollback capability
+require_prod_rollback:
+  enabled: true
+  applies_to: [prod, staging]
+  severity: blocking
+  message: "Production deployments must specify rollback_artifact"
+
+# Production deployments require change request
+require_prod_change_request:
+  enabled: true
+  applies_to: [prod, staging]
+  severity: blocking
+  message: "Production deployments must specify change_request"
+
+# Source and target must be different servers
+prevent_same_server:
+  enabled: true
+  severity: blocking
+  message: "Source and target servers must be different"
+
+# Functional BOMs must have entities
+require_entities_functional:
+  enabled: true
+  severity: blocking
+  message: "Functional deployments must specify entities[]"
+
+# ==============================================================================
+# FUTURE RULES (Disabled by default - enable when ready)
+# ==============================================================================
+
+# Limit deployment size
+max_entities_per_deployment:
+  enabled: false
+  limit: 50
+  severity: warning
+  message: "Large deployments are harder to troubleshoot. Consider splitting."
+
+# Deployment windows for prod
+enforce_deployment_windows:
+  enabled: false
+  applies_to: [prod]
+  allowed_days: [saturday, sunday]
+  allowed_hours: [0, 1, 2, 3, 4, 5]
+  severity: blocking
+  message: "Production deployments only allowed during maintenance windows"
+
+# Require baseline before functional
+require_baseline_first:
+  enabled: false
+  severity: warning
+  message: "Deploy baseline entities before functional deployments"

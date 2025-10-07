@@ -1,0 +1,16 @@
+# Baseline Repave BOM
+# Deploy ALL baseline entities to align infrastructure
+
+# Required fields
+version: "1.0.0"
+profile: baseline
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
+description: "Quarterly baseline alignment Q4 2025"
+created_by: "ops-team"
+
+# Optional metadata
+# change_request: "OPS-12345"
+# approved_by: "john.doe"
+
+# No explicit entities - uses all entities from baseline profile

@@ -1,0 +1,12 @@
+# Test BOM - Rule 5: Functional BOMs need entities
+# Expected: INVALID - "Functional deployments must specify entities[]"
+
+version: "1.0.0"
+change_request: "CR-TEST-002"
+profile: functional-cd
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
+description: "Test functional deployment without entities (should fail)"
+created_by: "test"
+
+# No entities field - should fail

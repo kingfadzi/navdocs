@@ -7,6 +7,7 @@ Validates BOM files for schema compliance and required fields
 import sys
 import yaml
 import re
+import os
 from pathlib import Path
 import argparse
 
@@ -20,6 +21,81 @@ def load_yaml(file_path):
         return None, str(e)
     except Exception as e:
         return None, str(e)
+
+
+def load_config():
+    """Load deployment config."""
+    root = Path(__file__).parent.parent
+    config_file = root / 'config' / 'deployment-config.yaml'
+    return load_yaml(config_file)
+
+
+def load_rules():
+    """Load governance rules."""
+    root = Path(__file__).parent.parent
+    rules_file = root / 'config' / 'rules.yaml'
+    if not rules_file.exists():
+        return {}  # No rules file = no additional validation
+    return load_yaml(rules_file)
+
+
+def check_rules(bom, config, rules):
+    """Apply governance rules. Returns list of errors."""
+    errors = []
+
+    source = bom.get('source_server', '')
+    target = bom.get('target_server', '')
+
+    # Get env types from servers
+    servers = config.get('servers', {})
+    source_env = servers.get(source, {}).get('env_type', '')
+    target_env = servers.get(target, {}).get('env_type', '')
+
+    # RULE 1: Prohibited deployment paths
+    rule = rules.get('prohibited_deployment_paths', {})
+    if rule.get('enabled'):
+        paths = rule.get('paths', [])
+        for path in paths:
+            source_match = source_env == path['source']
+            target_match = target_env in path['target']
+            if source_match and target_match:
+                reason = path.get('reason', 'Deployment path not allowed')
+                errors.append(f"{reason} ({source_env} → {target_env})")
+                break
+
+    # RULE 2: Prod needs rollback
+    rule = rules.get('require_prod_rollback', {})
+    if rule.get('enabled'):
+        applies_to = rule.get('applies_to', ['prod'])
+        if target_env in applies_to and 'rollback_artifact' not in bom:
+            errors.append(rule.get('message', 'Rollback artifact required'))
+
+    # RULE 3: Prod needs change request
+    rule = rules.get('require_prod_change_request', {})
+    if rule.get('enabled'):
+        applies_to = rule.get('applies_to', ['prod'])
+        if target_env in applies_to and 'change_request' not in bom:
+            errors.append(rule.get('message', 'Change request required'))
+
+    # RULE 4: Source != target
+    rule = rules.get('prevent_same_server', {})
+    if rule.get('enabled'):
+        if source and target and source == target:
+            errors.append(rule.get('message', 'Source and target must differ'))
+
+    # RULE 5: Functional BOMs need entities
+    rule = rules.get('require_entities_functional', {})
+    if rule.get('enabled'):
+        profile = bom.get('profile', '')
+        is_functional = 'functional' in profile
+        is_rollback = 'rollback_artifact' in bom and 'entities' not in bom
+
+        if is_functional and not is_rollback:
+            entities = bom.get('entities', [])
+            if not entities or len(entities) == 0:
+                errors.append(rule.get('message', 'Entities required'))
+
+    return errors
 
 
 def validate_semantic_version(version):
@@ -53,7 +129,7 @@ def validate_bom(bom_file):
     is_rollback = 'rollback_artifact' in bom and 'entities' not in bom
 
     # Common required fields
-    required_common = ['version', 'profile', 'target_environment']
+    required_common = ['version', 'profile', 'target_server']
 
     for field in required_common:
         if field not in bom:
@@ -73,12 +149,12 @@ def validate_bom(bom_file):
 
     # Additional validation for non-rollback BOMs
     if not is_rollback:
-        # Check source_environment
-        if 'source_environment' not in bom:
-            errors.append("Missing required field: source_environment")
+        # Check source_server
+        if 'source_server' not in bom:
+            errors.append("Missing required field: source_server")
 
         # Check for functional vs baseline
-        is_baseline = 'baseline' in str(bom_path)
+        is_baseline = 'baseline' in bom.get('profile', '')
 
         if is_baseline:
             # Baseline BOM validation
@@ -105,17 +181,18 @@ def validate_bom(bom_file):
                         if 'reference_code' not in entity:
                             errors.append(f"Entity {i}: missing reference_code")
 
-        # Check rollback_artifact for prod BOMs
-        if 'prod' in str(bom_path):
-            if 'rollback_artifact' not in bom:
-                errors.append("Production BOMs must specify rollback_artifact")
-
     # Rollback BOM specific validation
     if is_rollback:
         if 'rollback_artifact' not in bom:
             errors.append("Rollback BOM must specify rollback_artifact")
         if 'description' not in bom:
             errors.append("Rollback BOM should include description")
+
+    # Apply governance rules
+    config = load_config()
+    rules = load_rules()
+    if config and rules:
+        errors.extend(check_rules(bom, config, rules))
 
     return len(errors) == 0, errors
 
@@ -193,10 +270,10 @@ def main():
     print()
 
     if invalid_files > 0:
-        print("❌ Validation FAILED")
+        print(" Validation FAILED")
         sys.exit(1)
     else:
-        print("✅ Validation PASSED")
+        print(" Validation PASSED")
         sys.exit(0)
 
 

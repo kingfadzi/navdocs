@@ -1,0 +1,9 @@
+# Test BOM - Rule 4: Source and target must be different
+# Expected: INVALID - "Source and target servers must be different"
+
+version: "1.0.0"
+profile: baseline
+source_server: dev-ppm-useast
+target_server: dev-ppm-useast
+description: "Test same source and target server (should fail)"
+created_by: "test"

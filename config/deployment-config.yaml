@@ -22,16 +22,23 @@ nexus:
   subfolder: "2025"  # Organize by year
   # Credentials from environment variables: NEXUS_USERNAME, NEXUS_PASSWORD or NEXUS_TOKEN
 
-# PPM Environment Registry
-environments:
-  dev:
+# PPM Server Registry
+# Format: {env_type}-ppm-{region}
+servers:
+  dev-ppm-useast:
     url: "https://ppm-dev.company.com"
+    env_type: dev
     credential_path: "/secrets/ppm-dev"
+    region: useast
 
-  test:
+  test-ppm-useast:
     url: "https://ppm-test.company.com"
+    env_type: test
     credential_path: "/secrets/ppm-test"
+    region: useast
 
-  prod:
+  prod-ppm-useast:
     url: "https://ppm-prod.company.com"
+    env_type: prod
     credential_path: "/secrets/ppm-prod"
+    region: useast

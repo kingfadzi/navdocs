@@ -30,13 +30,13 @@ validate:bom:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/**/*.yaml
+        - boms/*.yaml
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/**/*.yaml
+        - boms/*.yaml
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
-        - boms/**/*.yaml
+        - boms/*.yaml
 
 # ============================================================
 # STAGE 2: REVIEW (Prod Only)
@@ -51,9 +51,10 @@ review:prod:
     - echo "============================================================"
     - echo ""
     - echo "BOMs pending deployment:"
-    - find boms/functional/prod boms/baseline -name "*.yaml" -type f 2>/dev/null || echo "No BOMs found"
+    - find boms -name "*.yaml" -type f 2>/dev/null || echo "No BOMs found"
     - echo ""
     - echo "Review the BOM files in this MR to verify:"
+    - echo "  - Correct target server (prod)"
     - echo "  - Correct entities and reference codes"
     - echo "  - Proper rollback_artifact specified"
     - echo "  - Change request approved"
@@ -65,8 +66,7 @@ review:prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/functional/prod/*.yaml
-        - boms/baseline/*.yaml
+        - boms/*.yaml
 
 # ============================================================
 # STAGE 3: DEPLOY
@@ -79,13 +79,14 @@ deploy:dev:
   script:
     - echo "Deploying to DEV environment..."
     - |
-      # Find all BOMs in dev and baseline directories
-      for bom in boms/functional/dev/*.yaml boms/baseline/*.yaml; do
+      # Find all BOMs
+      for bom in boms/*.yaml; do
         if [ -f "$bom" ]; then
           echo "Processing BOM: $bom"
 
-          # Determine deployment type from BOM location
-          if [[ "$bom" == *"baseline"* ]]; then
+          # Determine deployment type from profile in BOM
+          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
+          if [[ "$profile" == "baseline" ]]; then
             python3 tools/deploy.py baseline-repave --bom "$bom"
           else
             python3 tools/deploy.py functional-release --bom "$bom"
@@ -102,21 +103,21 @@ deploy:dev:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
-        - boms/functional/dev/*.yaml
-        - boms/baseline/*.yaml
+        - boms/*.yaml
 
 deploy:test:
   stage: deploy
   script:
     - echo "Deploying to TEST environment..."
     - |
-      # Find all BOMs in test and baseline directories
-      for bom in boms/functional/test/*.yaml boms/baseline/*.yaml; do
+      # Find all BOMs
+      for bom in boms/*.yaml; do
         if [ -f "$bom" ]; then
           echo "Processing BOM: $bom"
 
-          # Determine deployment type from BOM location
-          if [[ "$bom" == *"baseline"* ]]; then
+          # Determine deployment type from profile in BOM
+          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
+          if [[ "$profile" == "baseline" ]]; then
             python3 tools/deploy.py baseline-repave --bom "$bom"
           else
             python3 tools/deploy.py functional-release --bom "$bom"
@@ -133,21 +134,21 @@ deploy:test:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
-        - boms/functional/test/*.yaml
-        - boms/baseline/*.yaml
+        - boms/*.yaml
 
 deploy:prod:
   stage: deploy
   script:
     - echo "Deploying to PROD environment..."
     - |
-      # Find all BOMs in prod and baseline directories
-      for bom in boms/functional/prod/*.yaml boms/baseline/*.yaml; do
+      # Find all BOMs
+      for bom in boms/*.yaml; do
         if [ -f "$bom" ]; then
           echo "Processing BOM: $bom"
 
-          # Determine deployment type from BOM location
-          if [[ "$bom" == *"baseline"* ]]; then
+          # Determine deployment type from profile in BOM
+          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
+          if [[ "$profile" == "baseline" ]]; then
             python3 tools/deploy.py baseline-repave --bom "$bom"
           else
             python3 tools/deploy.py functional-release --bom "$bom"
@@ -166,8 +167,7 @@ deploy:prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/functional/prod/*.yaml
-        - boms/baseline/*.yaml
+        - boms/*.yaml
 
 # ============================================================
 # ROLLBACK JOBS
@@ -180,7 +180,7 @@ rollback:test:
     - echo "Rolling back TEST environment..."
     - |
       # Find rollback BOMs
-      for bom in boms/functional/test/*rollback*.yaml boms/functional/test/*ROLLBACK*.yaml; do
+      for bom in boms/*rollback*.yaml boms/*ROLLBACK*.yaml; do
         if [ -f "$bom" ]; then
           echo "Processing rollback BOM: $bom"
           python3 tools/deploy.py rollback --bom "$bom"
@@ -192,8 +192,8 @@ rollback:test:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
-        - boms/functional/test/*rollback*.yaml
-        - boms/functional/test/*ROLLBACK*.yaml
+        - boms/*rollback*.yaml
+        - boms/*ROLLBACK*.yaml
 
 rollback:prod:
   stage: deploy
@@ -201,7 +201,7 @@ rollback:prod:
     - echo "Rolling back PROD environment..."
     - |
       # Find rollback BOMs
-      for bom in boms/functional/prod/*rollback*.yaml boms/functional/prod/*ROLLBACK*.yaml; do
+      for bom in boms/*rollback*.yaml boms/*ROLLBACK*.yaml; do
         if [ -f "$bom" ]; then
           echo "Processing rollback BOM: $bom"
           python3 tools/deploy.py rollback --bom "$bom"
@@ -213,5 +213,5 @@ rollback:prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/functional/prod/*rollback*.yaml
-        - boms/functional/prod/*ROLLBACK*.yaml
+        - boms/*rollback*.yaml
+        - boms/*ROLLBACK*.yaml
