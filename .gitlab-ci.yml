@@ -16,6 +16,7 @@ default:
 variables:
   BOM_DIR: "boms"
 
+
 # ============================================================
 # STAGE 1: VALIDATE
 # Validates BOM schema and required fields
