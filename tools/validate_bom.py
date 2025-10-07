@@ -201,7 +201,7 @@ def find_changed_bom_files():
     """
     Find BOM files that have changed.
     In CI, this would check git diff.
-    For now, finds all BOM files.
+    For now, finds all BOM files (excluding test BOMs).
     """
     root = Path(__file__).parent.parent
     bom_dir = root / 'boms'
@@ -209,8 +209,13 @@ def find_changed_bom_files():
     if not bom_dir.exists():
         return []
 
-    # Find all YAML files in boms directory
-    bom_files = list(bom_dir.rglob('*.yaml'))
+    # Find all YAML files in boms directory (excluding test subdirectory)
+    bom_files = []
+    for yaml_file in bom_dir.rglob('*.yaml'):
+        # Skip files in test subdirectory
+        if 'test' not in yaml_file.parts:
+            bom_files.append(yaml_file)
+
     return bom_files
 
 
