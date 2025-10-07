@@ -1,0 +1,216 @@
+# PPM Deployment Pipeline
+# Lean CI/CD pipeline using existing deploy.py script
+
+stages:
+  - validate
+  - review
+  - deploy
+
+# Default configuration
+default:
+  image: python:3.11-slim
+  before_script:
+    - pip install PyYAML --quiet
+
+# Variables
+variables:
+  BOM_DIR: "boms"
+
+# ============================================================
+# STAGE 1: VALIDATE
+# Validates BOM schema and required fields
+# ============================================================
+
+validate:bom:
+  stage: validate
+  script:
+    - echo "Validating BOM files..."
+    - python3 tools/validate_bom.py --changed-files
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/**/*.yaml
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/**/*.yaml
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/**/*.yaml
+
+# ============================================================
+# STAGE 2: REVIEW (Prod Only)
+# Manual gate to review BOM before deployment
+# ============================================================
+
+review:prod:
+  stage: review
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION DEPLOYMENT REVIEW"
+    - echo "============================================================"
+    - echo ""
+    - echo "BOMs pending deployment:"
+    - find boms/functional/prod boms/baseline -name "*.yaml" -type f 2>/dev/null || echo "No BOMs found"
+    - echo ""
+    - echo "Review the BOM files in this MR to verify:"
+    - echo "  - Correct entities and reference codes"
+    - echo "  - Proper rollback_artifact specified"
+    - echo "  - Change request approved"
+    - echo ""
+    - echo "Click 'Approve' to proceed with deployment."
+    - echo "============================================================"
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/functional/prod/*.yaml
+        - boms/baseline/*.yaml
+
+# ============================================================
+# STAGE 3: DEPLOY
+# Run deployment using deploy.py
+# Handles: extract → import → archive automatically
+# ============================================================
+
+deploy:dev:
+  stage: deploy
+  script:
+    - echo "Deploying to DEV environment..."
+    - |
+      # Find all BOMs in dev and baseline directories
+      for bom in boms/functional/dev/*.yaml boms/baseline/*.yaml; do
+        if [ -f "$bom" ]; then
+          echo "Processing BOM: $bom"
+
+          # Determine deployment type from BOM location
+          if [[ "$bom" == *"baseline"* ]]; then
+            python3 tools/deploy.py baseline-repave --bom "$bom"
+          else
+            python3 tools/deploy.py functional-release --bom "$bom"
+          fi
+
+          echo ""
+        fi
+      done
+    - echo "DEV deployment complete"
+  artifacts:
+    paths:
+      - archives/*.zip
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/functional/dev/*.yaml
+        - boms/baseline/*.yaml
+
+deploy:test:
+  stage: deploy
+  script:
+    - echo "Deploying to TEST environment..."
+    - |
+      # Find all BOMs in test and baseline directories
+      for bom in boms/functional/test/*.yaml boms/baseline/*.yaml; do
+        if [ -f "$bom" ]; then
+          echo "Processing BOM: $bom"
+
+          # Determine deployment type from BOM location
+          if [[ "$bom" == *"baseline"* ]]; then
+            python3 tools/deploy.py baseline-repave --bom "$bom"
+          else
+            python3 tools/deploy.py functional-release --bom "$bom"
+          fi
+
+          echo ""
+        fi
+      done
+    - echo "TEST deployment complete"
+  artifacts:
+    paths:
+      - archives/*.zip
+    expire_in: 90 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/functional/test/*.yaml
+        - boms/baseline/*.yaml
+
+deploy:prod:
+  stage: deploy
+  script:
+    - echo "Deploying to PROD environment..."
+    - |
+      # Find all BOMs in prod and baseline directories
+      for bom in boms/functional/prod/*.yaml boms/baseline/*.yaml; do
+        if [ -f "$bom" ]; then
+          echo "Processing BOM: $bom"
+
+          # Determine deployment type from BOM location
+          if [[ "$bom" == *"baseline"* ]]; then
+            python3 tools/deploy.py baseline-repave --bom "$bom"
+          else
+            python3 tools/deploy.py functional-release --bom "$bom"
+          fi
+
+          echo ""
+        fi
+      done
+    - echo "PROD deployment complete"
+  artifacts:
+    paths:
+      - archives/*.zip
+    expire_in: 1 year
+  dependencies:
+    - review:prod
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/functional/prod/*.yaml
+        - boms/baseline/*.yaml
+
+# ============================================================
+# ROLLBACK JOBS
+# Manual trigger only, uses deploy.py rollback command
+# ============================================================
+
+rollback:test:
+  stage: deploy
+  script:
+    - echo "Rolling back TEST environment..."
+    - |
+      # Find rollback BOMs
+      for bom in boms/functional/test/*rollback*.yaml boms/functional/test/*ROLLBACK*.yaml; do
+        if [ -f "$bom" ]; then
+          echo "Processing rollback BOM: $bom"
+          python3 tools/deploy.py rollback --bom "$bom"
+          echo ""
+        fi
+      done
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/functional/test/*rollback*.yaml
+        - boms/functional/test/*ROLLBACK*.yaml
+
+rollback:prod:
+  stage: deploy
+  script:
+    - echo "Rolling back PROD environment..."
+    - |
+      # Find rollback BOMs
+      for bom in boms/functional/prod/*rollback*.yaml boms/functional/prod/*ROLLBACK*.yaml; do
+        if [ -f "$bom" ]; then
+          echo "Processing rollback BOM: $bom"
+          python3 tools/deploy.py rollback --bom "$bom"
+          echo ""
+        fi
+      done
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/functional/prod/*rollback*.yaml
+        - boms/functional/prod/*ROLLBACK*.yaml
