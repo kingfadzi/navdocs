@@ -14,12 +14,41 @@ import zipfile
 import shutil
 from datetime import datetime
 import nexus_client
+from validate_bom import validate_bom
 
 
 def load_yaml(file_path):
     """Load YAML file and return contents."""
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
+
+
+def validate_bom_before_deploy(bom_file):
+    """
+    Run BOM validation before deployment (mirrors CI validate stage).
+    Exits with error code 1 if validation fails.
+    """
+    print("=" * 60)
+    print("STAGE 1: VALIDATION")
+    print("=" * 60)
+    print(f"Validating: {bom_file}")
+    print()
+
+    is_valid, errors = validate_bom(bom_file)
+
+    if not is_valid:
+        print("  INVALID")
+        for error in errors:
+            print(f"    - {error}")
+        print()
+        print("=" * 60)
+        print("VALIDATION FAILED")
+        print("=" * 60)
+        print("Fix validation errors before deploying")
+        sys.exit(1)
+
+    print("  VALID")
+    print()
 
 
 def get_flag_string(profile_name):
@@ -165,7 +194,7 @@ def archive_deployment(bundles, bom_file, flags, config):
         zipf.writestr("manifest.yaml", yaml.dump(manifest))
         print(f"  Added: manifest.yaml")
 
-    print(f"✓ Archive created: {archive_path}")
+    print(f"Archive created: {archive_path}")
     return archive_path
 
 
@@ -195,7 +224,7 @@ def push_to_nexus(archive_path, bom_file, config):
         artifact_path,
         archive_path
     )
-    print(f"✓ Artifact URL: {artifact_url}")
+    print(f"Artifact URL: {artifact_url}")
     return artifact_url
 
 
@@ -204,8 +233,11 @@ def baseline_repave(bom_file):
     Deploy ALL baseline entities.
     Entity list comes from profile.
     """
+    # Validate BOM first (mirrors CI pipeline)
+    validate_bom_before_deploy(bom_file)
+
     print("=" * 60)
-    print("BASELINE REPAVE")
+    print("STAGE 2: BASELINE REPAVE")
     print("=" * 60)
     print(f"BOM: {bom_file}")
     print()
@@ -284,8 +316,11 @@ def functional_release(bom_file):
     Deploy SPECIFIC functional entities.
     Entity list comes from BOM.
     """
+    # Validate BOM first (mirrors CI pipeline)
+    validate_bom_before_deploy(bom_file)
+
     print("=" * 60)
-    print("FUNCTIONAL RELEASE")
+    print("STAGE 2: FUNCTIONAL RELEASE")
     print("=" * 60)
     print(f"BOM: {bom_file}")
     print()
@@ -368,8 +403,11 @@ def rollback(bom_file):
     Rollback deployment by downloading and redeploying previous artifact.
     Uses rollback_artifact reference from BOM.
     """
+    # Validate BOM first (mirrors CI pipeline)
+    validate_bom_before_deploy(bom_file)
+
     print("=" * 60)
-    print("ROLLBACK DEPLOYMENT")
+    print("STAGE 2: ROLLBACK DEPLOYMENT")
     print("=" * 60)
     print(f"BOM: {bom_file}")
     print()
@@ -412,7 +450,7 @@ def rollback(bom_file):
 
     with zipfile.ZipFile(archive_path, 'r') as zipf:
         zipf.extractall(extract_dir)
-        print(f"✓ Extracted to: {extract_dir}")
+        print(f"Extracted to: {extract_dir}")
     print()
 
     # Read flags from archive

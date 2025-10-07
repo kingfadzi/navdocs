@@ -9,8 +9,8 @@ target_environment: test
 description: "Quarterly baseline alignment Q4 2025"
 created_by: "ops-team"
 
-# Optional: Rollback to previous baseline (if needed)
-# rollback_artifact: "nexus://ppm-deployments/2025/baseline-v0.9.0-20250901-120000-bundles.zip"
+# Rollback to previous baseline (if deployment fails)
+rollback_artifact: "nexus://ppm-deployments/2025/baseline-v0.9.0-20250901-120000-bundles.zip"
 
 # Optional metadata (for future use)
 # change_request: "OPS-12345"
