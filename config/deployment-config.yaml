@@ -1,0 +1,37 @@
+# Deployment Configuration
+
+# kMigrator script paths
+# Point to mock scripts for testing, or real PPM installation scripts for production
+kmigrator:
+  extract_script: "./mock/kMigratorExtract.sh"
+  import_script: "./mock/kMigratorImport.sh"
+
+  # For production, use real PPM paths:
+  # extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
+  # import_script: "/opt/ppm/bin/kMigratorImport.sh"
+
+# Deployment settings
+deployment:
+  bundle_dir: "./bundles"
+  archive_dir: "./archives"
+
+# Nexus artifact repository (for rollback archives)
+nexus:
+  url: "http://localhost:8081"  # Mock Nexus server
+  repository: "ppm-deployments"
+  subfolder: "2025"  # Organize by year
+  # Credentials from environment variables: NEXUS_USERNAME, NEXUS_PASSWORD or NEXUS_TOKEN
+
+# PPM Environment Registry
+environments:
+  dev:
+    url: "https://ppm-dev.company.com"
+    credential_path: "/secrets/ppm-dev"
+
+  test:
+    url: "https://ppm-test.company.com"
+    credential_path: "/secrets/ppm-test"
+
+  prod:
+    url: "https://ppm-prod.company.com"
+    credential_path: "/secrets/ppm-prod"

@@ -1,0 +1,41 @@
+# Functional Release BOM
+# Deploy specific functional entities
+
+# Required fields
+version: "2.0.0"
+change_request: "CR-54321"
+profile: functional-cd
+source_environment: dev
+target_environment: test
+description: "Sprint 42 - Incident workflow enhancements"
+created_by: "platform-team"
+
+# Required: Specific entities to deploy
+entities:
+  - entity_id: 9
+    reference_code: "WF_INCIDENT_MGMT"
+    entity_type: "Workflow"
+    description: "Incident management approval workflow"
+
+  - entity_id: 9
+    reference_code: "WF_CHANGE_REQUEST"
+    entity_type: "Workflow"
+    description: "Change request workflow"
+
+  - entity_id: 19
+    reference_code: "RT_INCIDENT"
+    entity_type: "Request Type"
+    description: "Incident request form"
+
+  - entity_id: 17
+    reference_code: "RPT_INCIDENT_SUMMARY"
+    entity_type: "Report Type"
+    description: "Incident summary report"
+
+# Rollback to previous version
+rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-20250930-153000-bundles.zip"
+
+# Optional metadata (for future use)
+# jira_ticket: "PROJ-1234"
+# approved_by: ["jane.smith", "john.doe"]
+# deployment_window: "2025-10-08T02:00:00Z"

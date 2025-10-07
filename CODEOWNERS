@@ -1,0 +1,37 @@
+# PPM Deployment CODEOWNERS
+# Defines required approvers for different parts of the repository
+#
+# Approval Requirements:
+# - Non-prod (dev/test): 2 approvals minimum
+# - Prod: 3+ approvals minimum
+# - Baseline (any env): Must include @platform-team
+
+# Default: require 2 approvals from any team
+* @tech-leads @platform-team @ops-team
+
+# Baseline BOMs - require platform team (high risk)
+/boms/baseline/** @platform-team @ops-team
+
+# Production functional BOMs - require tech lead + ops (3+ total with default)
+/boms/functional/prod/** @tech-leads @ops-team
+
+# Test functional BOMs - require tech lead
+/boms/functional/test/** @tech-leads
+
+# Dev BOMs - standard 2 approvals
+/boms/functional/dev/** @tech-leads @platform-team
+
+# Profiles - require platform team (affects all deployments)
+/profiles/** @platform-team
+
+# Flag schema - immutable, require platform lead
+/tools/ppm-flag-schema.yaml @platform-lead @platform-team
+
+# Pipeline configuration - require platform team
+/.gitlab-ci.yml @platform-team @ops-team
+
+# Deployment and validation scripts - require platform team
+/tools/deploy.py @platform-team
+/tools/flag_compiler.py @platform-team
+/tools/validate_bom.py @platform-team
+/tools/nexus_client.py @platform-team

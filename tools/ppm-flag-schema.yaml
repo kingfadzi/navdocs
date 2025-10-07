@@ -1,0 +1,110 @@
+# PPM Flag Schema - Canonical flag position definitions
+# DO NOT MODIFY - This is the reference schema for all profiles
+#
+# Reference: OpenText PPM kMigratorImport.sh Flag Definitions
+# https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122150_InstallAdmin_Server.htm
+#
+# These 25 flags control how entities are imported:
+# - Flags 1-9, 13-25: Replace existing entities (Y/N)
+# - Flags 10-12: Add missing dependencies (Y/N)
+
+flag_schema:
+  - position: 1
+    key: replace_object_type
+    description: "Replace existing Object Type"
+
+  - position: 2
+    key: replace_request_type
+    description: "Replace existing Request Type"
+
+  - position: 3
+    key: replace_request_header_type
+    description: "Replace existing Request Header Type"
+
+  - position: 4
+    key: replace_special_command
+    description: "Replace existing Special Command"
+
+  - position: 5
+    key: replace_validation
+    description: "Replace existing Validation"
+
+  - position: 6
+    key: replace_workflow
+    description: "Replace existing Workflow"
+
+  - position: 7
+    key: replace_report_type
+    description: "Replace existing Report Type"
+
+  - position: 8
+    key: replace_workplan_template
+    description: "Replace existing Workplan Template"
+
+  - position: 9
+    key: replace_workflow_step_sources
+    description: "Replace existing Workflow Step Sources"
+
+  - position: 10
+    key: add_missing_environment
+    description: "Add missing Environment"
+
+  - position: 11
+    key: add_missing_security_group
+    description: "Add missing Security Group"
+
+  - position: 12
+    key: add_missing_request_status
+    description: "Add missing Request Status"
+
+  - position: 13
+    key: replace_overview_page_section
+    description: "Replace existing Overview Page Section"
+
+  - position: 14
+    key: replace_user_data_context
+    description: "Replace existing User Data Context"
+
+  - position: 15
+    key: replace_portlet_definition
+    description: "Replace existing Portlet Definition"
+
+  - position: 16
+    key: replace_module
+    description: "Replace existing Module"
+
+  - position: 17
+    key: replace_data_source
+    description: "Replace existing Data Source"
+
+  - position: 18
+    key: replace_project_type
+    description: "Replace existing Project Type"
+
+  - position: 19
+    key: replace_sub_workflow
+    description: "Replace existing Sub workflow"
+
+  - position: 20
+    key: replace_program_type
+    description: "Replace existing Program Type"
+
+  - position: 21
+    key: replace_odata_data_source
+    description: "Replace existing OData Data Source"
+
+  - position: 22
+    key: replace_portfolio_type
+    description: "Replace existing Portfolio Type"
+
+  - position: 23
+    key: replace_ppm_integration_sdk
+    description: "Replace existing PPM Integration SDK"
+
+  - position: 24
+    key: replace_custom_menu
+    description: "Replace existing Custom Menu (always replaced regardless)"
+
+  - position: 25
+    key: replace_chatbot_intents
+    description: "Replace existing Chatbot intents (25.2+)"
