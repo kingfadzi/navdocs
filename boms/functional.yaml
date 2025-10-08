@@ -3,13 +3,13 @@
 # Use for: Sprint releases, feature deployments, bug fixes
 
 # Required fields
-version: "1.0.0"
-change_request: "CR-XXXXX"  # Update with actual CR number
+version: "1.0.1"
+change_request: "CR-12345"
 profile: functional-cd
 source_server: dev-ppm-useast
-target_server: test-ppm-useast  # UPDATE THIS: dev, test, or prod server
-description: "Functional deployment template - update before use"
-created_by: "platform-team"
+target_server: test-ppm-useast
+description: "Test pipeline - workflow validation"
+created_by: "fadzi"
 
 # Required: Specific entities to deploy
 entities:
