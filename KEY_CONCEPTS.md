@@ -6,7 +6,7 @@ Declarative, opinionated deployment system for OpenText PPM entity migration wit
 - **BOM-driven deployments** - All deployments defined in version-controlled YAML files
 - **Baseline-first approach** - Stable foundation before continuous deployment
 - **GitLab CI/CD pipeline** - Automated deployments with approval gates
-- **Nexus rollback** - Every deployment archived for instant rollback
+- **Manifest-based rollback** - Every deployment archived with manifest for instant rollback
 - **Mock-first testing** - Test locally without real PPM server
 
 ---
@@ -31,7 +31,7 @@ target_environment: test
 entities:
   - entity_id: 9
     reference_code: "WF_INCIDENT_MGMT"
-rollback_artifact: "nexus://ppm-deployments/2025/CR-12300-v0.9.0-bundles.zip"
+# rollback_pipeline_id: 12300  # Pipeline ID from previous successful deployment
 ```
 
 ### 2. **Profiles**
@@ -45,22 +45,24 @@ Profiles compile to 25-character Y/N flag string automatically.
 Single orchestrator that:
 1. Extracts entities from source
 2. Imports to target with compiled flags
-3. Archives deployment to Nexus
+3. Archives deployment with rollback manifest
 4. Cleans up temporary files
 
 Used for both local testing and CI/CD.
 
 ### 4. **GitLab Pipeline**
-Three stages:
+Five granular stages:
 - **Validate** - BOM schema checks
 - **Review** - Manual approval (prod only)
-- **Deploy** - Calls `deploy.py` automatically
+- **Extract** - Extract entities from source
+- **Import** - Import bundles to target
+- **Archive** - Create archive and evidence
 
-### 5. **Nexus Mock**
-Local file-based mock that simulates artifact repository:
-- Stores deployment archives (bundles + BOM + flags)
+### 5. **Rollback System**
+Manifest-based rollback using GitLab artifacts:
+- Stores deployment archives (bundles + BOM + flags + manifest)
 - Enables rollback without re-extracting
-- No external dependencies for testing
+- Uses pipeline ID to reference previous deployments
 
 ---
 
@@ -139,7 +141,7 @@ entities:
   - entity_id: 9
     reference_code: "WF_INCIDENT_MGMT"
     entity_type: "Workflow"
-rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-bundles.zip"
+# rollback_pipeline_id: 12345  # Pipeline ID from previous successful deployment
 ```
 
 ---
@@ -164,7 +166,7 @@ rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-bundles.zip"
    └─> MR to develop (2 approvals) → Merge → Auto-deploy to test
 
 3. Copy to prod → boms/functional/prod/CR-12345-v1.0.0.yaml
-   └─> Add rollback_artifact
+   └─> Add rollback_pipeline_id
    └─> MR to main (3+ approvals) → Manual review → Deploy to prod
 ```
 
@@ -182,15 +184,17 @@ CR-12345-v1.0.0-20251007-bundles.zip
 ├── bom.yaml              # Original BOM
 ├── flags.txt             # Exact flags used
 └── manifest.yaml         # Metadata (version, timestamp, checksums)
+
+ROLLBACK_MANIFEST.yaml    # Points to exact archive bundle (GitLab artifact)
 ```
 
-Pushed to Nexus: `nexus://ppm-deployments/2025/CR-12345-v1.0.0-bundles.zip`
+Stored as GitLab pipeline artifact with manifest for deterministic rollback.
 
 ### **Rollback Execution**
 
-1. Create rollback BOM pointing to Nexus artifact
+1. Add `rollback_pipeline_id` to BOM pointing to previous GitLab pipeline
 2. Get same approvals as forward deployment
-3. Pipeline downloads archive and redeploys using **original flags**
+3. Pipeline downloads artifacts using manifest and redeploys using **original flags**
 
 **Key:** Rollback uses exact flags from original deployment for consistency.
 
@@ -223,7 +227,7 @@ Pushed to Nexus: `nexus://ppm-deployments/2025/CR-12345-v1.0.0-bundles.zip`
 * **Idempotent** - Same BOM = same result (safe to rerun)
 * **Testable** - Mock scripts work without real PPM
 * **Lean** - Reuses `deploy.py` for local and CI/CD
-* **Traceable** - Git commits + Nexus archives = full audit trail
+* **Traceable** - Git commits + GitLab artifacts = full audit trail
 
 ---
 
@@ -232,12 +236,12 @@ Pushed to Nexus: `nexus://ppm-deployments/2025/CR-12345-v1.0.0-bundles.zip`
 ### **For Platform Engineers:**
 - No manual flag strings (compiled from profiles)
 - No manual kMigrator commands (automated by deploy.py)
-- Instant rollback (download from Nexus, redeploy)
+- Instant rollback (download from GitLab artifacts, redeploy)
 
 ### **For Operations:**
 - Clear approval gates (2 or 3+ depending on environment)
 - BOM review before deployment (see exactly what will change)
-- Audit trail (Git history + Nexus artifacts)
+- Audit trail (Git history + GitLab artifacts)
 
 ### **For Developers:**
 - Test locally with mock scripts (no PPM needed)
@@ -265,7 +269,7 @@ Pushed to Nexus: `nexus://ppm-deployments/2025/CR-12345-v1.0.0-bundles.zip`
 4. Requires 3+ approvals including platform team
 
 ### **Emergency Rollback**
-1. Create rollback BOM pointing to previous Nexus artifact
+1. Add `rollback_pipeline_id` to BOM pointing to previous GitLab pipeline
 2. Get expedited approvals (same as forward: 3+ for prod)
 3. Deploy (fast: no extraction needed)
 

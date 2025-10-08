@@ -8,7 +8,7 @@ target_server: prod-ppm-useast
 description: "Test prod deployment without change request (should fail)"
 created_by: "test"
 
-rollback_artifact: "nexus://ppm-deployments/2025/test-v1.0.0.zip"
+rollback_pipeline_id: 12345
 
 entities:
   - entity_id: 9

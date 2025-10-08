@@ -18,8 +18,8 @@ import zipfile
 import shutil
 from datetime import datetime
 import argparse
-import nexus_client
 from validate_bom import validate_bom
+import rollback
 
 
 def load_yaml(file_path):
@@ -275,34 +275,39 @@ def archive_deployment(bundles, bom_file, flags, config):
     return archive_path
 
 
-def push_to_nexus(archive_path, bom_file, config):
+def print_gitlab_artifact_info(archive_path, bom_file, metadata):
     """
-    Mock Nexus upload: Copy archive to nexus-storage directory.
-    Returns the Nexus artifact URL.
+    Print GitLab artifact information for manual rollback reference.
+    Users can copy the pipeline ID and use it in the rollback_pipeline_id field.
     """
-    # Load BOM
-    bom = load_yaml(bom_file)
-
-    # Get Nexus config
-    nexus_config = config['nexus']
-    repository = nexus_config['repository']
-    subfolder = nexus_config.get('subfolder', '')
-
-    # Build artifact path in Nexus
     archive_name = Path(archive_path).name
-    artifact_path = f"{subfolder}/{archive_name}" if subfolder else archive_name
 
-    print(f"Pushing to mock Nexus repository '{repository}'...")
+    # Get pipeline ID from environment (if running in CI)
+    pipeline_id = os.environ.get('CI_PIPELINE_ID', 'N/A')
+    pipeline_url = os.environ.get('CI_PIPELINE_URL', 'N/A')
 
-    # Upload to mock Nexus (just file copy)
-    artifact_url = nexus_client.upload_artifact(
-        None,  # nexus_url not used in mock
-        repository,
-        artifact_path,
-        archive_path
-    )
-    print(f"Artifact URL: {artifact_url}")
-    return artifact_url
+    print("=" * 60)
+    print("ROLLBACK INFORMATION")
+    print("=" * 60)
+    print(f"Archive created: {archive_name}")
+    print()
+
+    if pipeline_id != 'N/A':
+        print("To use this deployment as a rollback point, add this to your BOM:")
+        print(f"  rollback_pipeline_id: {pipeline_id}")
+        print()
+        print(f"Pipeline URL: {pipeline_url}")
+    else:
+        print("To use this deployment as a rollback point:")
+        print("  1. Note the pipeline ID from GitLab UI")
+        print("  2. Add to your BOM: rollback_pipeline_id: <pipeline_id>")
+
+    print()
+    print("This pipeline deployed:")
+    print(f"  - Archive: {archive_name}")
+    print(f"  - Profile: {metadata.get('profile', 'unknown')}")
+    print(f"  - Target: {metadata.get('target_server', 'unknown')}")
+    print("=" * 60)
 
 
 def extract_command(bom_file, skip_validation=False):
@@ -454,9 +459,70 @@ def import_command(metadata_file="bundles/deployment-metadata.yaml"):
     print()
 
 
+def create_rollback_manifest(archive_path, metadata, bom_file):
+    """
+    Create ROLLBACK_MANIFEST.yaml for deterministic rollback discovery.
+
+    This manifest is saved at the root of the project as a GitLab artifact
+    (separate from the deployment archive ZIP). It tells rollback exactly
+    which bundle to use and validates the target environment.
+
+    Args:
+        archive_path: Path to the deployment archive ZIP
+        metadata: Deployment metadata dict
+        bom_file: Path to the BOM file
+
+    Returns:
+        Path to the created manifest
+    """
+    root = Path(__file__).parent.parent
+
+    # Create manifest at project root (will be a GitLab artifact)
+    manifest_path = root / "ROLLBACK_MANIFEST.yaml"
+
+    # Load BOM for additional context
+    bom = load_yaml(bom_file)
+
+    # Build manifest
+    manifest = {
+        'rollback_bundle_path': str(archive_path.relative_to(root)),
+        'deployment_metadata': {
+            'deployment_type': metadata.get('deployment_type'),
+            'profile': metadata.get('profile'),
+            'target_server': metadata.get('target_server'),
+            'source_server': metadata.get('source_server'),
+            'bom_version': metadata.get('bom_version'),
+            'change_request': metadata.get('change_request'),
+            'extracted_at': metadata.get('extracted_at'),
+            'entities_count': len(metadata.get('bundles', [])),
+            'flags': metadata.get('flags')
+        },
+        'git_context': {
+            'commit_sha': os.environ.get('CI_COMMIT_SHA', 'local'),
+            'commit_branch': os.environ.get('CI_COMMIT_BRANCH', 'local'),
+            'pipeline_id': os.environ.get('CI_PIPELINE_ID', 'local'),
+            'pipeline_url': os.environ.get('CI_PIPELINE_URL', 'local')
+        },
+        'manifest_version': '1.0.0',
+        'created_at': datetime.now().isoformat()
+    }
+
+    # Write manifest
+    with open(manifest_path, 'w') as f:
+        yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
+
+    print(f"Created rollback manifest: {manifest_path.name}")
+    print(f"  Bundle: {manifest['rollback_bundle_path']}")
+    print(f"  Target: {manifest['deployment_metadata']['target_server']}")
+    print(f"  Profile: {manifest['deployment_metadata']['profile']}")
+    print(f"  Entities: {manifest['deployment_metadata']['entities_count']}")
+
+    return manifest_path
+
+
 def archive_command(metadata_file="bundles/deployment-metadata.yaml"):
     """
-    PHASE 3: Archive, push to Nexus, create evidence.
+    PHASE 3: Archive and create evidence.
 
     For CI/CD pipeline: Reads bundles/deployment-metadata.yaml from extract stage
     For manual use: Called by baseline_repave() and functional_release()
@@ -482,9 +548,13 @@ def archive_command(metadata_file="bundles/deployment-metadata.yaml"):
     archive_path = archive_deployment(bundles, bom_file, flags, config)
     print()
 
-    # Push to Nexus
-    print("Pushing to Nexus...")
-    push_to_nexus(archive_path, bom_file, config)
+    # Create rollback manifest (manifest-based discovery)
+    print("Creating rollback manifest...")
+    create_rollback_manifest(archive_path, metadata, bom_file)
+    print()
+
+    # Print GitLab artifact info for rollback reference
+    print_gitlab_artifact_info(archive_path, bom_file, metadata)
     print()
 
     # Create evidence package
@@ -554,94 +624,6 @@ def functional_release(bom_file):
     print("=" * 60)
 
 
-def rollback(bom_file):
-    """
-    Rollback deployment by downloading and redeploying previous artifact.
-    Uses rollback_artifact reference from BOM.
-
-    Note: Rollback is atomic - no extract/archive needed.
-    """
-    # Validate BOM first (mirrors CI pipeline)
-    validate_bom_before_deploy(bom_file)
-
-    print("=" * 60)
-    print("ROLLBACK DEPLOYMENT")
-    print("=" * 60)
-    print(f"BOM: {bom_file}")
-    print()
-
-    # Get paths
-    root = Path(__file__).parent.parent
-
-    # Load BOM
-    bom = load_yaml(bom_file)
-    rollback_artifact = bom.get('rollback_artifact')
-
-    if not rollback_artifact:
-        print("Error: No rollback_artifact specified in BOM")
-        sys.exit(1)
-
-    target_server = bom['target_server']
-
-    print(f"Target: {target_server}")
-    print(f"Rollback artifact: {rollback_artifact}")
-    print()
-
-    # Load config
-    config = load_yaml(root / "config" / "deployment-config.yaml")
-    target_url = config['servers'][target_server]['url']
-    import_script = config['kmigrator']['import_script']
-
-    # Download artifact from Nexus
-    print("Downloading rollback artifact from Nexus...")
-    archive_dir = root / config['deployment']['archive_dir']
-    archive_dir.mkdir(exist_ok=True)
-    archive_path = archive_dir / "rollback-temp.zip"
-
-    nexus_client.download_artifact(rollback_artifact, archive_path)
-    print()
-
-    # Extract archive
-    print("Extracting rollback archive...")
-    extract_dir = archive_dir / "rollback-extract"
-    extract_dir.mkdir(exist_ok=True)
-
-    with zipfile.ZipFile(archive_path, 'r') as zipf:
-        zipf.extractall(extract_dir)
-        print(f"Extracted to: {extract_dir}")
-    print()
-
-    # Read flags from archive
-    flags_file = extract_dir / "flags.txt"
-    with open(flags_file, 'r') as f:
-        flags = f.read().strip()
-
-    print(f"Using original deployment flags: {flags}")
-    print()
-
-    # Find all bundles in archive
-    bundle_dir = extract_dir / "bundles"
-    bundles = list(bundle_dir.glob("*.xml"))
-
-    print(f"Found {len(bundles)} bundles to import")
-    print()
-
-    # Import all bundles
-    for bundle in bundles:
-        run_import(import_script, target_url, str(bundle), flags, 'charset', 'nochange')
-        print()
-
-    # Cleanup
-    print("Cleaning up temporary files...")
-    shutil.rmtree(extract_dir)
-    os.remove(archive_path)
-    print()
-
-    print("=" * 60)
-    print(f"ROLLBACK COMPLETE: {len(bundles)} entities restored")
-    print("=" * 60)
-
-
 def main():
     """Main entry point - parse command line and run deployment."""
 
@@ -701,7 +683,7 @@ Examples:
         functional_release(args.bom)
 
     elif args.command == 'rollback':
-        rollback(args.bom)
+        rollback.rollback(args.bom, validate_bom_before_deploy, run_import)
 
     elif args.command == 'extract':
         extract_command(args.bom, skip_validation=args.skip_validation)

@@ -15,12 +15,11 @@ deployment:
   bundle_dir: "./bundles"
   archive_dir: "./archives"
 
-# Nexus artifact repository (for rollback archives)
-nexus:
-  url: "http://localhost:8081"  # Mock Nexus server
-  repository: "ppm-deployments"
-  subfolder: "2025"  # Organize by year
-  # Credentials from environment variables: NEXUS_USERNAME, NEXUS_PASSWORD or NEXUS_TOKEN
+# GitLab artifact settings (for rollback)
+# Artifacts stored automatically by GitLab CI/CD
+# No external storage configuration needed
+# Rollback uses pipeline ID: rollback_pipeline_id: 12345
+# Works with both GitLab.com and on-prem GitLab instances
 
 # PPM Server Registry
 # Format: {env_type}-ppm-{region}

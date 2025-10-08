@@ -11,8 +11,8 @@
 - `boms/...`
 
 **Rollback Plan:**
-<!-- For prod deployments, specify rollback artifact or state if none exists -->
-- Rollback artifact: `nexus://...` (or "N/A - first deployment")
+<!-- For prod deployments, specify rollback pipeline ID or state if none exists -->
+- Rollback pipeline ID: `12345` (or "N/A - first deployment")
 
 ---
 
@@ -30,7 +30,7 @@
 - [ ] Version follows semantic versioning (X.Y.Z)
 - [ ] Profile exists and is correct
 - [ ] Entity IDs and reference codes are correct
-- [ ] `rollback_artifact` specified (for prod)
+- [ ] `rollback_pipeline_id` specified (for prod)
 
 ### Post-Merge (Automated)
 - [ ] BOM validation passed
@@ -59,7 +59,7 @@
 ## Rollback Procedure
 
 If this deployment fails:
-1. Create rollback BOM pointing to previous Nexus artifact
+1. Create rollback BOM pointing to previous pipeline ID (copy from GitLab pipeline URL)
 2. Follow same approval process
 3. Merge to trigger rollback pipeline
 

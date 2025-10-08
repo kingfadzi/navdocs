@@ -23,7 +23,7 @@ require_prod_rollback:
   enabled: true
   applies_to: [dev, test, uat, staging, prod]
   severity: blocking
-  message: "All deployments must specify rollback_artifact (enables recovery from mistakes)"
+  message: "All deployments must specify rollback_pipeline_id (enables recovery from mistakes)"
 
 # Production deployments require change request
 require_prod_change_request:

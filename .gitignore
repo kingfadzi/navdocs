@@ -1,8 +1,9 @@
 # Temporary deployment files
 bundles/
 archives/
-nexus-storage/
 evidence/
+rollback-temp/
+ROLLBACK_MANIFEST.yaml
 
 # Deployment logs
 *.log

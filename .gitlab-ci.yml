@@ -239,7 +239,7 @@ import:prod:
 
 # ============================================================
 # STAGE 5: ARCHIVE
-# Create deployment archive, push to Nexus, create evidence
+# Create deployment archive and evidence
 # ============================================================
 
 .archive_template:
@@ -260,6 +260,7 @@ import:prod:
       - archive.log
       - boms/baseline.yaml
       - boms/functional.yaml
+      - ROLLBACK_MANIFEST.yaml
 
 archive:test:
   extends: .archive_template

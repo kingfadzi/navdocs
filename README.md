@@ -14,7 +14,7 @@ Declarative, opinionated configuration for OpenText PPM entity migration.
 │   └── functional-cd.yaml         # Business logic deployment profile
 ├── boms/                          # Bill of Materials for releases (flat structure)
 ├── config/
-│   ├── deployment-config.yaml     # Infrastructure config (servers, scripts, Nexus)
+│   ├── deployment-config.yaml     # Infrastructure config (servers, scripts)
 │   └── rules.yaml                 # Governance rules for validation
 ├── mock/                          # Mock scripts for testing
 │   ├── kMigratorExtract.sh        # Mock PPM extract
@@ -22,15 +22,14 @@ Declarative, opinionated configuration for OpenText PPM entity migration.
 ├── tools/
 │   ├── ppm-flag-schema.yaml       # Canonical 25-flag definitions (immutable)
 │   ├── flag_compiler.py           # Compiles structured flags to Y/N string
-│   ├── nexus_client.py            # Mock Nexus client (local file operations)
 │   ├── validate_bom.py            # BOM validation script (CI/CD)
 │   └── deploy.py                  # Main deployment orchestrator
+│   └── rollback.py                # Rollback orchestrator
 ├── .gitlab-ci.yml                 # GitLab CI/CD pipeline
 ├── .gitignore                     # Git ignore rules
 ├── CODEOWNERS                     # Required approvers per file
 ├── bundles/                       # Temporary bundle storage (gitignored)
-├── archives/                      # Deployment archives (gitignored)
-└── nexus-storage/                 # Mock Nexus storage (gitignored)
+└── archives/                      # Deployment archives (gitignored)
 ```
 
 ## Profiles
@@ -61,14 +60,11 @@ export PPM_PASSWORD=your_password
 python3 tools/deploy.py baseline-repave --bom boms/baseline-dev-to-test.yaml
 ```
 
-**Note:** Nexus is mocked using local file operations in `nexus-storage/` directory. No external server required.
-
 ## Configuration
 
 Edit `config/deployment-config.yaml` to configure:
 - **Script paths** (mock or real kMigrator scripts)
 - **Server registry** (server URLs, env types, regions)
-- **Nexus repository** (mocked locally, stores in `nexus-storage/`)
 
 ```yaml
 # kMigrator script paths
@@ -81,12 +77,6 @@ kmigrator:
 deployment:
   bundle_dir: "./bundles"
   archive_dir: "./archives"
-
-# Mock Nexus (uses local nexus-storage/ directory)
-nexus:
-  url: "http://localhost:8081"  # Ignored in mock
-  repository: "ppm-deployments"
-  subfolder: "2025"
 
 # PPM Server Registry (format: {env_type}-ppm-{region})
 servers:
@@ -115,7 +105,7 @@ Deployment rules are defined in `config/rules.yaml` and automatically enforced d
 
 **Critical Rules (enabled by default):**
 1. **Prohibited deployment paths** - Prevents reverse flow (prod→dev/test) and lateral flow (test→dev)
-2. **Prod rollback requirement** - Production deployments must specify `rollback_artifact`
+2. **Prod rollback requirement** - Production deployments must specify `rollback_pipeline_id`
 3. **Prod change request** - Production deployments must specify `change_request`
 4. **Different servers** - Source and target servers must be different
 5. **Functional entities** - Functional BOMs must have non-empty `entities[]`
@@ -180,7 +170,7 @@ python3 tools/deploy.py baseline-repave --bom boms/baseline.yaml
 - Compiles flags from profile specified in BOM
 - Imports to target with "Replace Existing = Y" and "Add Missing = Y"
 - Creates deployment archive (bundles + BOM + flags + manifest)
-- Pushes archive to Nexus for rollback capability
+- Creates rollback manifest for GitLab artifact-based rollback
 - Cleans up temporary files
 
 ---
@@ -214,7 +204,7 @@ entities:
     description: "Incident request form"
 
 # Rollback to previous version
-rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-20250930-153000-bundles.zip"
+# rollback_pipeline_id: 12345  # Pipeline ID from previous successful deployment
 ```
 
 **Run deployment:**
@@ -233,17 +223,17 @@ python3 tools/deploy.py functional-release --bom boms/functional.yaml
 - Compiles flags from profile specified in BOM
 - Imports to target with "Replace Existing = Y" and "Add Missing = N"
 - Creates deployment archive (bundles + BOM + flags + manifest)
-- Pushes archive to Nexus for rollback capability
+- Creates rollback manifest for GitLab artifact-based rollback
 - Cleans up temporary files
 
 ---
 
 ### Rollback Deployment
-Restore a previous deployment using archived artifacts from Nexus.
+Restore a previous deployment using archived artifacts from GitLab.
 
 **Prerequisites:**
-- Previous deployment was successful and archived to Nexus
-- BOM has `rollback_artifact` field pointing to Nexus archive
+- Previous deployment was successful and archived to GitLab artifacts
+- BOM has `rollback_pipeline_id` field pointing to GitLab pipeline
 
 **Edit functional.yaml for rollback:**
 ```bash
@@ -258,8 +248,8 @@ target_server: test-ppm-useast
 description: "Rollback Sprint 42 deployment"
 created_by: "ops-team"
 
-# Rollback to previous version
-rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-20250930-153000-bundles.zip"
+# Rollback to previous version (copy from GitLab pipeline URL)
+rollback_pipeline_id: 12345  # Pipeline ID from previous successful deployment
 ```
 
 **Run rollback:**
@@ -267,14 +257,15 @@ rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-20250930-153000
 # Set credentials
 export PPM_USERNAME=your_username
 export PPM_PASSWORD=your_password
+export GITLAB_TOKEN=your_gitlab_token  # Or use CI_JOB_TOKEN in CI
 
 # Rollback using BOM
 python3 tools/deploy.py rollback --bom boms/functional.yaml
 ```
 
 **What it does:**
-- Reads `rollback_artifact` from BOM
-- Retrieves deployment archive from mock Nexus (`nexus-storage/`)
+- Reads `rollback_pipeline_id` from BOM
+- Downloads deployment archive from GitLab artifacts using API
 - Extracts bundles and original deployment flags
 - Imports bundles to target using original flags (exact rollback)
 - Cleans up temporary files
@@ -441,7 +432,7 @@ git pull
 # Edit same BOM, add rollback artifact
 vim boms/functional.yaml
 # Change: target_server: prod-ppm-useast
-# Add: rollback_artifact: "nexus://..." (from test deployment)
+# Add: rollback_pipeline_id: 12345 (from test deployment pipeline)
 
 # Commit and create MR to main
 git add boms/functional.yaml
@@ -456,7 +447,7 @@ git push
 
 **Approver reviews:**
 1. Check BOM content in MR (entities, reference codes)
-2. Verify rollback_artifact is specified
+2. Verify rollback_pipeline_id is specified
 3. Confirm change request is approved
 4. Click "Approve" to proceed with deployment
 
@@ -475,10 +466,10 @@ target_server: prod-ppm-useast
 description: "Rollback incident workflow to v0.9.0"
 created_by: "ops-team"
 
-# Point to previous version artifact
-rollback_artifact: "nexus://ppm-deployments/2025/CR-12300-v0.9.0-...-bundles.zip"
+# Point to previous version pipeline
+rollback_pipeline_id: 12300  # Pipeline ID from previous successful deployment
 
-# No entities needed for rollback (uses artifact)
+# No entities needed for rollback (uses pipeline artifacts)
 ```
 
 **Deploy rollback:**

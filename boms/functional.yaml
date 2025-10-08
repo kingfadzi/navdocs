@@ -22,4 +22,4 @@ entities:
     entity_type: "Request Type"
     description: "Incident request form"
 
-rollback_artifact: "nexus://ppm-deployments/2025/CR-54300-v1.9.0-20250930-153000-bundles.zip"
+rollback_pipeline_id: 770  # Use "local" for local testing, or pipeline ID for GitLab rollback

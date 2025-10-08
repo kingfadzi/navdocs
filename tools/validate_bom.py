@@ -76,8 +76,8 @@ def check_rules(bom, config, rules, branch_name=None):
     rule = rules.get('require_prod_rollback', {})
     if rule.get('enabled'):
         applies_to = rule.get('applies_to', ['prod'])
-        if target_env in applies_to and 'rollback_artifact' not in bom:
-            errors.append(rule.get('message', 'Rollback artifact required'))
+        if target_env in applies_to and 'rollback_pipeline_id' not in bom:
+            errors.append(rule.get('message', 'Rollback pipeline ID required'))
 
     # RULE 3: Prod needs change request
     rule = rules.get('require_prod_change_request', {})
@@ -97,7 +97,7 @@ def check_rules(bom, config, rules, branch_name=None):
     if rule.get('enabled'):
         profile = bom.get('profile', '')
         is_functional = 'functional' in profile
-        is_rollback = 'rollback_artifact' in bom and 'entities' not in bom
+        is_rollback = 'rollback_pipeline_id' in bom and 'entities' not in bom
 
         if is_functional and not is_rollback:
             entities = bom.get('entities', [])
@@ -165,7 +165,7 @@ def validate_bom(bom_file, branch_name=None):
         return False, ["BOM file is empty"]
 
     # Determine if this is a rollback BOM
-    is_rollback = 'rollback_artifact' in bom and 'entities' not in bom
+    is_rollback = 'rollback_pipeline_id' in bom and 'entities' not in bom
 
     # Common required fields
     required_common = ['version', 'profile', 'target_server']
@@ -222,8 +222,8 @@ def validate_bom(bom_file, branch_name=None):
 
     # Rollback BOM specific validation
     if is_rollback:
-        if 'rollback_artifact' not in bom:
-            errors.append("Rollback BOM must specify rollback_artifact")
+        if 'rollback_pipeline_id' not in bom:
+            errors.append("Rollback BOM must specify rollback_pipeline_id")
         if 'description' not in bom:
             errors.append("Rollback BOM should include description")
 

@@ -1,5 +1,5 @@
 # Test BOM - Rule 2: Prod needs rollback
-# Expected: INVALID - "Production deployments must specify rollback_artifact"
+# Expected: INVALID - "Production deployments must specify rollback_pipeline_id"
 
 version: "1.0.0"
 change_request: "CR-TEST-001"
