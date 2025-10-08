@@ -76,6 +76,12 @@ require_branch_environment_match:
     main:
       allowed_env_types: [prod, staging]
 
+# Prevent multiple BOM changes in single commit (fail fast)
+prevent_multiple_bom_changes:
+  enabled: true
+  severity: blocking
+  message: "Cannot update both baseline.yaml and functional.yaml in the same commit"
+
 # ==============================================================================
 # FUTURE RULES (Disabled by default - enable when ready)
 # ==============================================================================

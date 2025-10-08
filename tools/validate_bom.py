@@ -10,6 +10,7 @@ import re
 import os
 from pathlib import Path
 import argparse
+import subprocess
 
 
 def load_yaml(file_path):
@@ -229,9 +230,8 @@ def validate_bom(bom_file, branch_name=None):
 
 def find_changed_bom_files():
     """
-    Find BOM files that have changed.
-    In CI, this would check git diff.
-    For now, finds all BOM files (excluding test BOMs).
+    Find BOM files that have changed in this commit.
+    Uses git diff in CI, falls back to all BOMs locally.
     """
     root = Path(__file__).parent.parent
     bom_dir = root / 'boms'
@@ -239,10 +239,32 @@ def find_changed_bom_files():
     if not bom_dir.exists():
         return []
 
-    # Find all YAML files in boms directory (excluding test subdirectory)
+    # In CI, use git diff to find actually changed files
+    commit_before = os.environ.get('CI_COMMIT_BEFORE_SHA')
+    if commit_before:
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--name-only', f'{commit_before}...HEAD'],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=root
+            )
+            changed_files = result.stdout.strip().split('\n')
+
+            # Filter for only baseline.yaml and functional.yaml
+            bom_files = []
+            for file in changed_files:
+                if file in ['boms/baseline.yaml', 'boms/functional.yaml']:
+                    bom_files.append(root / file)
+
+            return bom_files
+        except subprocess.CalledProcessError:
+            pass  # Fall through to local mode
+
+    # Local mode: return all BOMs
     bom_files = []
     for yaml_file in bom_dir.rglob('*.yaml'):
-        # Skip files in test subdirectory
         if 'test' not in yaml_file.parts:
             bom_files.append(yaml_file)
 
@@ -281,6 +303,22 @@ def main():
     if branch_name:
         print(f"Branch: {branch_name}")
     print()
+
+    # Check if both BOMs changed (fail fast)
+    bom_names = [str(f.name) for f in bom_files]
+    if 'baseline.yaml' in bom_names and 'functional.yaml' in bom_names:
+        rules = load_rules()
+        rule = rules.get('prevent_multiple_bom_changes', {})
+        if rule.get('enabled'):
+            print("✗ MULTIPLE BOM CHANGES DETECTED")
+            print(f"  {rule.get('message')}")
+            print("  Baseline and functional are different deployment types.")
+            print("  Create separate commits for each.")
+            print()
+            print("=" * 60)
+            print("VALIDATION FAILED")
+            print("=" * 60)
+            sys.exit(1)
 
     total_files = len(bom_files)
     valid_files = 0
