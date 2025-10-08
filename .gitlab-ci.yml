@@ -7,7 +7,6 @@ stages:
   - extract
   - import
   - archive
-  - rollback
 
 # Default configuration
 default:
@@ -306,13 +305,28 @@ archive:prod:
 
 # ============================================================
 # ROLLBACK JOBS
-# Manual rollback triggered within deployment pipeline
+# Manual rollback triggered after deployment (doesn't block pipeline)
 # Uses rollback_artifact from the same BOM that was deployed
+# Runs in .post stage - pipeline shows complete after archive
 # ============================================================
 
 # Hidden template for all rollback jobs
 .rollback_template:
-  stage: rollback
+  stage: .post  # Special GitLab stage that doesn't block pipeline completion
+  needs:
+    # Only need extract artifacts (bundles + metadata)
+    # All listed as optional - GitLab uses whichever ran for this branch
+    - job: extract:test
+      artifacts: true
+      optional: true
+    - job: extract:staging
+      artifacts: true
+      optional: true
+    - job: extract:prod
+      artifacts: true
+      optional: true
+  when: manual
+  allow_failure: false
   script:
     - echo "Rolling back ${DEPLOY_ENV} environment..."
     - |
@@ -367,6 +381,7 @@ rollback:test:
       changes:
         - boms/baseline.yaml
         - boms/functional.yaml
+      when: manual  # Available but doesn't block pipeline
 
 rollback:staging:
   extends: .rollback_template
@@ -377,15 +392,15 @@ rollback:staging:
       changes:
         - boms/baseline.yaml
         - boms/functional.yaml
+      when: manual
 
 rollback:prod:
   extends: .rollback_template
   variables:
     DEPLOY_ENV: "PROD"
-  dependencies:
-    - review:prod
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - boms/baseline.yaml
         - boms/functional.yaml
+      when: manual
