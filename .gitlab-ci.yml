@@ -26,8 +26,7 @@ validate:bom:
   stage: validate
   script:
     - echo "Validating BOM files..."
-    - echo "Branch: $CI_COMMIT_BRANCH"
-    - echo ""
+    - echo "Branch:$CI_COMMIT_BRANCH"
     - python3 tools/validate_bom.py --changed-files --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -95,7 +94,6 @@ deploy:dev:
   stage: deploy
   script:
     - echo "Deploying to DEV environment..."
-    - echo ""
     - |
       # Check if both BOMs changed (prevent accidental dual deployment)
       BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
@@ -157,7 +155,6 @@ deploy:test:
   stage: deploy
   script:
     - echo "Deploying to TEST environment..."
-    - echo ""
     - |
       # Check if both BOMs changed (prevent accidental dual deployment)
       BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
@@ -219,7 +216,6 @@ deploy:prod:
   stage: deploy
   script:
     - echo "Deploying to PROD environment..."
-    - echo ""
     - |
       # Check if both BOMs changed (prevent accidental dual deployment)
       BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
