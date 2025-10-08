@@ -326,7 +326,7 @@ archive:prod:
       artifacts: true
       optional: true
   when: manual
-  allow_failure: false
+  allow_failure: true  # Allows pipeline to complete without waiting
   script:
     - echo "Rolling back ${DEPLOY_ENV} environment..."
     - |
