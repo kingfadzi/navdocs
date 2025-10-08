@@ -3,12 +3,12 @@
 # Use for: Sprint releases, feature deployments, bug fixes
 
 # Required fields
-version: "1.0.3"
+version: "1.0.4"
 change_request: "CR-12345"
 profile: functional-cd
-source_server: dev-ppm-useast
-target_server: test-ppm-useast
-description: "Test pipeline - git diff detection validation"
+source_server: test-ppm-useast
+target_server: prod-ppm-useast
+description: "Production deployment - workflow release"
 created_by: "fadzi"
 
 # Required: Specific entities to deploy
@@ -16,10 +16,10 @@ entities:
   - entity_id: 9
     reference_code: "EXAMPLE_WORKFLOW"
     entity_type: "Workflow"
-    description: "Example workflow - replace with actual entities"
+    description: "Example workflow production release"
 
 # Rollback to previous version (required for prod)
-# rollback_artifact: "nexus://ppm-deployments/2025/CR-XXXXX-vX.Y.Z-TIMESTAMP-bundles.zip"
+rollback_artifact: "nexus://ppm-deployments/2025/CR-12300-v1.0.0-20251007-120000-bundles.zip"
 
 # Optional metadata
 # jira_ticket: "PROJ-1234"
