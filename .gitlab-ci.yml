@@ -7,6 +7,7 @@ stages:
   - extract
   - import
   - archive
+  - rollback
 
 # Default configuration
 default:
@@ -311,7 +312,7 @@ archive:prod:
 
 # Hidden template for all rollback jobs
 .rollback_template:
-  stage: deploy
+  stage: rollback
   script:
     - echo "Rolling back ${DEPLOY_ENV} environment..."
     - |
