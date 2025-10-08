@@ -2,6 +2,10 @@
 """
 PPM Deployment Orchestrator
 Extracts and imports PPM entities across environments
+
+Supports two modes:
+1. Monolithic (manual): baseline-repave, functional-release - one-shot deployments
+2. Granular (CI/CD): extract → import → archive - separate pipeline stages
 """
 
 import yaml
@@ -13,6 +17,7 @@ import glob
 import zipfile
 import shutil
 from datetime import datetime
+import argparse
 import nexus_client
 from validate_bom import validate_bom
 
@@ -29,7 +34,7 @@ def validate_bom_before_deploy(bom_file):
     Exits with error code 1 if validation fails.
     """
     print("=" * 60)
-    print("STAGE 1: VALIDATION")
+    print("VALIDATION")
     print("=" * 60)
     print(f"Validating: {bom_file}")
     print()
@@ -49,6 +54,24 @@ def validate_bom_before_deploy(bom_file):
 
     print("  VALID")
     print()
+
+
+def save_deployment_metadata(metadata, output_path="bundles/deployment-metadata.yaml"):
+    """Save deployment state for passing between pipeline stages."""
+    # Ensure bundles directory exists
+    Path(output_path).parent.mkdir(exist_ok=True)
+
+    with open(output_path, 'w') as f:
+        yaml.dump(metadata, f, default_flow_style=False)
+    print(f"Saved metadata: {output_path}")
+
+
+def load_deployment_metadata(metadata_path="bundles/deployment-metadata.yaml"):
+    """Load deployment state from previous pipeline stage."""
+    if not Path(metadata_path).exists():
+        print(f"Error: Metadata file not found: {metadata_path}")
+        sys.exit(1)
+    return load_yaml(metadata_path)
 
 
 def get_flag_string(profile_name):
@@ -282,13 +305,24 @@ def push_to_nexus(archive_path, bom_file, config):
     return artifact_url
 
 
-def baseline_repave(bom_file):
+def extract_command(bom_file, skip_validation=False):
     """
-    Deploy ALL baseline entities.
-    Entity list comes from profile.
+    PHASE 1: Extract entities and save metadata.
+
+    For CI/CD pipeline: Creates deployment-metadata.yaml
+    For manual use: Called by baseline_repave() and functional_release()
+
+    Returns: List of bundle paths
     """
-    # Validate BOM first (mirrors CI pipeline)
-    validate_bom_before_deploy(bom_file)
+    # Validate BOM unless skipped (CI already validated)
+    if not skip_validation:
+        validate_bom_before_deploy(bom_file)
+
+    print("=" * 60)
+    print("PHASE 1: EXTRACT")
+    print("=" * 60)
+    print(f"BOM: {bom_file}")
+    print()
 
     # Get paths
     root = Path(__file__).parent.parent
@@ -296,25 +330,6 @@ def baseline_repave(bom_file):
     # Load BOM
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
-
-    # Runtime check: Profile must match deployment type
-    if 'baseline' not in profile_name.lower():
-        print("=" * 60)
-        print("ERROR: Profile Mismatch")
-        print("=" * 60)
-        print(f"baseline-repave command requires a baseline profile")
-        print(f"Found profile: {profile_name}")
-        print()
-        print(f"Use: python3 tools/deploy.py functional-release --bom {bom_file}")
-        print("=" * 60)
-        sys.exit(1)
-
-    print("=" * 60)
-    print("STAGE 2: BASELINE REPAVE")
-    print("=" * 60)
-    print(f"BOM: {bom_file}")
-    print()
-
     source_server = bom['source_server']
     target_server = bom['target_server']
 
@@ -323,14 +338,15 @@ def baseline_repave(bom_file):
     print(f"Profile: {profile_name}")
     print()
 
-    # Load config and profile
-    config = load_yaml(root / "config" / "deployment-config.yaml")
-    profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
+    # Determine deployment type and i18n mode
+    is_baseline = 'baseline' in profile_name.lower()
+    deployment_type = 'baseline-repave' if is_baseline else 'functional-release'
+    i18n_mode = 'none' if is_baseline else 'charset'
 
+    # Load config
+    config = load_yaml(root / "config" / "deployment-config.yaml")
     source_url = config['servers'][source_server]['url']
-    target_url = config['servers'][target_server]['url']
     extract_script = config['kmigrator']['extract_script']
-    import_script = config['kmigrator']['import_script']
 
     # Get flags
     print(f"Compiling flags from {profile_name} profile...")
@@ -338,159 +354,203 @@ def baseline_repave(bom_file):
     print(f"Flags: {flags}")
     print()
 
-    # Extract all entities from profile
-    print(f"Extracting {len(profile['entities'])} entity types...")
+    # Extract entities (baseline: from profile, functional: from BOM)
+    bundles = []
+
+    if is_baseline:
+        # Load profile for entity list
+        profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
+        print(f"Extracting {len(profile['entities'])} baseline entity types...")
+        print()
+
+        for entity in profile['entities']:
+            bundle = run_extract(extract_script, source_url, entity['id'])
+            bundles.append(bundle)
+            print()
+    else:
+        # Get entity list from BOM
+        print(f"Extracting {len(bom['entities'])} functional entities...")
+        print()
+
+        for entity in bom['entities']:
+            bundle = run_extract(
+                extract_script,
+                source_url,
+                entity['entity_id'],
+                entity['reference_code']
+            )
+            bundles.append(bundle)
+            print()
+
+    # Save metadata for import and archive stages
+    metadata = {
+        'deployment_type': deployment_type,
+        'profile': profile_name,
+        'source_server': source_server,
+        'target_server': target_server,
+        'flags': flags,
+        'bundles': bundles,
+        'bom_file': str(bom_file),
+        'bom_version': bom.get('version', 'unknown'),
+        'change_request': bom.get('change_request', 'baseline'),
+        'extracted_at': datetime.now().isoformat(),
+        'i18n_mode': i18n_mode,
+        'refdata_mode': 'nochange'
+    }
+
+    save_deployment_metadata(metadata)
     print()
 
-    bundles = []
-    for entity in profile['entities']:
-        bundle = run_extract(extract_script, source_url, entity['id'])
-        bundles.append(bundle)
-        print()
+    print(f"Extracted {len(bundles)} bundles")
+    print("=" * 60)
+    print()
+
+    return bundles
+
+
+def import_command(metadata_file="bundles/deployment-metadata.yaml"):
+    """
+    PHASE 2: Import bundles to target server.
+
+    For CI/CD pipeline: Reads bundles/deployment-metadata.yaml from extract stage
+    For manual use: Called by baseline_repave() and functional_release()
+    """
+    print("=" * 60)
+    print("PHASE 2: IMPORT")
+    print("=" * 60)
+    print()
+
+    # Load metadata from extract stage
+    metadata = load_deployment_metadata(metadata_file)
+
+    target_server = metadata['target_server']
+    flags = metadata['flags']
+    bundles = metadata['bundles']
+    i18n_mode = metadata['i18n_mode']
+    refdata_mode = metadata['refdata_mode']
+
+    print(f"Target: {target_server}")
+    print(f"Flags: {flags}")
+    print(f"Bundles: {len(bundles)}")
+    print()
+
+    # Load config
+    root = Path(__file__).parent.parent
+    config = load_yaml(root / "config" / "deployment-config.yaml")
+
+    target_url = config['servers'][target_server]['url']
+    import_script = config['kmigrator']['import_script']
 
     # Import all bundles
     print(f"Importing {len(bundles)} bundles...")
     print()
 
     for bundle in bundles:
-        run_import(import_script, target_url, bundle, flags, 'none', 'nochange')
+        run_import(import_script, target_url, bundle, flags, i18n_mode, refdata_mode)
         print()
 
-    # Archive and push to Nexus
-    print("=" * 60)
-    print("ARCHIVING DEPLOYMENT")
+    print(f"Imported {len(bundles)} bundles")
     print("=" * 60)
     print()
 
+
+def archive_command(metadata_file="bundles/deployment-metadata.yaml"):
+    """
+    PHASE 3: Archive, push to Nexus, create evidence.
+
+    For CI/CD pipeline: Reads bundles/deployment-metadata.yaml from extract stage
+    For manual use: Called by baseline_repave() and functional_release()
+    """
+    print("=" * 60)
+    print("PHASE 3: ARCHIVE")
+    print("=" * 60)
+    print()
+
+    # Load metadata from extract stage
+    metadata = load_deployment_metadata(metadata_file)
+
+    bundles = metadata['bundles']
+    bom_file = metadata['bom_file']
+    flags = metadata['flags']
+
+    # Load config
+    root = Path(__file__).parent.parent
+    config = load_yaml(root / "config" / "deployment-config.yaml")
+
+    # Create deployment archive
+    print("Creating deployment archive...")
     archive_path = archive_deployment(bundles, bom_file, flags, config)
+    print()
+
+    # Push to Nexus
+    print("Pushing to Nexus...")
     push_to_nexus(archive_path, bom_file, config)
     print()
 
     # Create evidence package
-    print("=" * 60)
-    print("CREATING EVIDENCE PACKAGE")
-    print("=" * 60)
-    print()
+    print("Creating evidence package...")
     create_evidence_package(bom_file, archive_path, config)
     print()
 
-    # Cleanup
+    # Cleanup bundles
     print("Cleaning up temporary files...")
     for bundle in bundles:
-        os.remove(bundle)
-        print(f"Deleted: {bundle}")
+        if Path(bundle).exists():
+            os.remove(bundle)
+            print(f"Deleted: {bundle}")
     print()
 
     print("=" * 60)
-    print(f"COMPLETE: {len(bundles)} entity types deployed")
+    print(f"ARCHIVE COMPLETE: {len(bundles)} bundles archived")
+    print("=" * 60)
+    print()
+
+
+def baseline_repave(bom_file):
+    """
+    One-shot baseline deployment.
+    Internally calls: extract → import → archive
+    """
+    print("=" * 60)
+    print("BASELINE REPAVE (One-shot deployment)")
+    print("=" * 60)
+    print()
+
+    # Phase 1: Extract
+    extract_command(bom_file, skip_validation=False)
+
+    # Phase 2: Import
+    import_command()
+
+    # Phase 3: Archive
+    archive_command()
+
+    print("=" * 60)
+    print("BASELINE REPAVE COMPLETE")
     print("=" * 60)
 
 
 def functional_release(bom_file):
     """
-    Deploy SPECIFIC functional entities.
-    Entity list comes from BOM.
+    One-shot functional deployment.
+    Internally calls: extract → import → archive
     """
-    # Validate BOM first (mirrors CI pipeline)
-    validate_bom_before_deploy(bom_file)
-
-    # Get paths
-    root = Path(__file__).parent.parent
-
-    # Load BOM
-    bom = load_yaml(bom_file)
-    profile_name = bom['profile']
-
-    # Runtime check: Profile must match deployment type
-    if 'functional' not in profile_name.lower():
-        print("=" * 60)
-        print("ERROR: Profile Mismatch")
-        print("=" * 60)
-        print(f"functional-release command requires a functional profile")
-        print(f"Found profile: {profile_name}")
-        print()
-        print(f"Use: python3 tools/deploy.py baseline-repave --bom {bom_file}")
-        print("=" * 60)
-        sys.exit(1)
-
     print("=" * 60)
-    print("STAGE 2: FUNCTIONAL RELEASE")
-    print("=" * 60)
-    print(f"BOM: {bom_file}")
-    print()
-
-    source_server = bom['source_server']
-    target_server = bom['target_server']
-
-    print(f"Source: {source_server}")
-    print(f"Target: {target_server}")
-    print(f"Profile: {profile_name}")
-    print()
-
-    # Load config
-    config = load_yaml(root / "config" / "deployment-config.yaml")
-
-    source_url = config['servers'][source_server]['url']
-    target_url = config['servers'][target_server]['url']
-    extract_script = config['kmigrator']['extract_script']
-    import_script = config['kmigrator']['import_script']
-
-    # Get flags
-    print(f"Compiling flags from {profile_name} profile...")
-    flags = get_flag_string(profile_name)
-    print(f"Flags: {flags}")
-    print()
-
-    # Extract specific entities from BOM
-    print(f"Extracting {len(bom['entities'])} entities...")
-    print()
-
-    bundles = []
-    for entity in bom['entities']:
-        bundle = run_extract(
-            extract_script,
-            source_url,
-            entity['entity_id'],
-            entity['reference_code']
-        )
-        bundles.append(bundle)
-        print()
-
-    # Import all bundles
-    print(f"Importing {len(bundles)} bundles...")
-    print()
-
-    for bundle in bundles:
-        run_import(import_script, target_url, bundle, flags, 'charset', 'nochange')
-        print()
-
-    # Archive and push to Nexus
-    print("=" * 60)
-    print("ARCHIVING DEPLOYMENT")
+    print("FUNCTIONAL RELEASE (One-shot deployment)")
     print("=" * 60)
     print()
 
-    archive_path = archive_deployment(bundles, bom_file, flags, config)
-    push_to_nexus(archive_path, bom_file, config)
-    print()
+    # Phase 1: Extract
+    extract_command(bom_file, skip_validation=False)
 
-    # Create evidence package
-    print("=" * 60)
-    print("CREATING EVIDENCE PACKAGE")
-    print("=" * 60)
-    print()
-    create_evidence_package(bom_file, archive_path, config)
-    print()
+    # Phase 2: Import
+    import_command()
 
-    # Cleanup
-    print("Cleaning up temporary files...")
-    for bundle in bundles:
-        os.remove(bundle)
-        print(f"Deleted: {bundle}")
-    print()
+    # Phase 3: Archive
+    archive_command()
 
     print("=" * 60)
-    print(f"COMPLETE: {len(bundles)} entities deployed")
+    print("FUNCTIONAL RELEASE COMPLETE")
     print("=" * 60)
 
 
@@ -498,12 +558,14 @@ def rollback(bom_file):
     """
     Rollback deployment by downloading and redeploying previous artifact.
     Uses rollback_artifact reference from BOM.
+
+    Note: Rollback is atomic - no extract/archive needed.
     """
     # Validate BOM first (mirrors CI pipeline)
     validate_bom_before_deploy(bom_file)
 
     print("=" * 60)
-    print("STAGE 2: ROLLBACK DEPLOYMENT")
+    print("ROLLBACK DEPLOYMENT")
     print("=" * 60)
     print(f"BOM: {bom_file}")
     print()
@@ -583,36 +645,72 @@ def rollback(bom_file):
 def main():
     """Main entry point - parse command line and run deployment."""
 
-    # Check command line arguments
-    if len(sys.argv) < 4:
-        print("Usage:")
-        print("  deploy.py baseline-repave --bom BOM_FILE")
-        print("  deploy.py functional-release --bom BOM_FILE")
-        print("  deploy.py rollback --bom BOM_FILE")
-        print()
-        print("Examples:")
-        print("  deploy.py baseline-repave --bom boms/baseline.yaml")
-        print("  deploy.py functional-release --bom boms/functional.yaml")
-        print("  deploy.py rollback --bom boms/functional.yaml")
-        print()
-        print("Note: For CI/CD pipelines, use baseline-repave or functional-release")
-        print("      The script handles all stages: extract → import → archive")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description='PPM Deployment Orchestrator',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Monolithic commands (one-shot deployments)
+  deploy.py baseline-repave --bom boms/baseline.yaml
+  deploy.py functional-release --bom boms/functional.yaml
+  deploy.py rollback --bom boms/functional.yaml
 
-    # Parse arguments
-    deployment_type = sys.argv[1]
-    bom_file = sys.argv[3]  # Expects --bom at position 2
+  # Granular commands (CI/CD pipeline stages)
+  deploy.py extract --bom boms/functional.yaml --skip-validation
+  deploy.py import --metadata deployment-metadata.yaml
+  deploy.py archive --metadata deployment-metadata.yaml
+        """
+    )
 
-    # Run the appropriate deployment
-    if deployment_type == 'baseline-repave':
-        baseline_repave(bom_file)
-    elif deployment_type == 'functional-release':
-        functional_release(bom_file)
-    elif deployment_type == 'rollback':
-        rollback(bom_file)
-    else:
-        print(f"Error: Unknown deployment type: {deployment_type}")
-        sys.exit(1)
+    parser.add_argument(
+        'command',
+        choices=['baseline-repave', 'functional-release', 'rollback',
+                 'extract', 'import', 'archive'],
+        help='Deployment command to execute'
+    )
+
+    parser.add_argument(
+        '--bom',
+        help='BOM file path (required for baseline-repave, functional-release, rollback, extract)'
+    )
+
+    parser.add_argument(
+        '--metadata',
+        default='bundles/deployment-metadata.yaml',
+        help='Metadata file path (for import and archive commands)'
+    )
+
+    parser.add_argument(
+        '--skip-validation',
+        action='store_true',
+        help='Skip BOM validation (for extract command when CI already validated)'
+    )
+
+    args = parser.parse_args()
+
+    # Validate required arguments
+    if args.command in ['baseline-repave', 'functional-release', 'rollback', 'extract']:
+        if not args.bom:
+            parser.error(f"{args.command} requires --bom argument")
+
+    # Execute command
+    if args.command == 'baseline-repave':
+        baseline_repave(args.bom)
+
+    elif args.command == 'functional-release':
+        functional_release(args.bom)
+
+    elif args.command == 'rollback':
+        rollback(args.bom)
+
+    elif args.command == 'extract':
+        extract_command(args.bom, skip_validation=args.skip_validation)
+
+    elif args.command == 'import':
+        import_command(args.metadata)
+
+    elif args.command == 'archive':
+        archive_command(args.metadata)
 
 
 if __name__ == '__main__':

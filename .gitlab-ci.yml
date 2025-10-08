@@ -4,7 +4,9 @@
 stages:
   - validate
   - review
-  - deploy
+  - extract
+  - import
+  - archive
 
 # Default configuration
 default:
@@ -90,18 +92,15 @@ review:prod:
         - boms/functional.yaml
 
 # ============================================================
-# STAGE 3: DEPLOY
-# Run deployment using deploy.py
-# Handles: extract → import → archive automatically
+# STAGE 3: EXTRACT
+# Extract entities from source server
+# Creates bundles and deployment metadata
 # ============================================================
 
-# Hidden template for all deployment jobs
-.deploy_template:
-  stage: deploy
+.extract_template:
+  stage: extract
   script:
-    - echo "Deploying to ${DEPLOY_ENV} environment..."
-    - echo "Current directory:" && pwd
-    - echo "Mock scripts:" && ls -la mock/ || echo "mock/ not found"
+    - echo "Extracting entities for ${DEPLOY_ENV} environment..."
     - |
       # Check if both BOMs changed (prevent accidental dual deployment)
       BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
@@ -120,43 +119,154 @@ review:prod:
       # Determine which static BOM changed
       if [ $BASELINE_CHANGED -gt 0 ]; then
         BOM_FILE="boms/baseline.yaml"
-        DEPLOY_TYPE="baseline-repave"
       elif [ $FUNCTIONAL_CHANGED -gt 0 ]; then
         BOM_FILE="boms/functional.yaml"
-        DEPLOY_TYPE="functional-release"
       else
         echo "No baseline.yaml or functional.yaml changes detected"
         exit 0
       fi
 
       echo "BOM: $BOM_FILE"
-      echo "Deployment type: $DEPLOY_TYPE"
       echo ""
 
-      # Execute deployment (environment already validated by validate:bom job)
-      python3 tools/deploy.py $DEPLOY_TYPE --bom "$BOM_FILE" 2>&1 | tee deployment.log
+      # Execute extract (skip validation - already done by validate:bom job)
+      python3 tools/deploy.py extract --bom "$BOM_FILE" --skip-validation 2>&1 | tee extract.log
 
       # Capture exit code
-      DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
+      EXIT_CODE=${PIPESTATUS[0]}
 
       echo ""
-      echo "Deployment exit code: $DEPLOY_EXIT_CODE"
+      echo "Extract exit code: $EXIT_CODE"
 
-      exit $DEPLOY_EXIT_CODE
-    - echo "${DEPLOY_ENV} deployment complete"
+      exit $EXIT_CODE
+  artifacts:
+    paths:
+      - bundles/*.xml
+      - bundles/deployment-metadata.yaml
+      - extract.log
+    expire_in: 7 days
+
+extract:test:
+  extends: .extract_template
+  variables:
+    DEPLOY_ENV: "TEST"
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+extract:staging:
+  extends: .extract_template
+  variables:
+    DEPLOY_ENV: "STAGING"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+extract:prod:
+  extends: .extract_template
+  variables:
+    DEPLOY_ENV: "PROD"
+  dependencies:
+    - review:prod
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+# ============================================================
+# STAGE 4: IMPORT
+# Import bundles to target server
+# ============================================================
+
+.import_template:
+  stage: import
+  script:
+    - echo "Importing bundles to ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py import --metadata bundles/deployment-metadata.yaml 2>&1 | tee import.log
+    - |
+      EXIT_CODE=${PIPESTATUS[0]}
+      echo ""
+      echo "Import exit code: $EXIT_CODE"
+      exit $EXIT_CODE
   artifacts:
     when: always
     paths:
-      - deployment.log
-      - boms/baseline.yaml
-      - boms/functional.yaml
-      - archives/*.zip
-      - evidence/*.zip
+      - import.log
+    expire_in: 30 days
 
-deploy:test:
-  extends: .deploy_template
+import:test:
+  extends: .import_template
   variables:
     DEPLOY_ENV: "TEST"
+  dependencies:
+    - extract:test
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+import:staging:
+  extends: .import_template
+  variables:
+    DEPLOY_ENV: "STAGING"
+  dependencies:
+    - extract:staging
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+import:prod:
+  extends: .import_template
+  variables:
+    DEPLOY_ENV: "PROD"
+  dependencies:
+    - extract:prod
+  artifacts:
+    expire_in: 1 year
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+# ============================================================
+# STAGE 5: ARCHIVE
+# Create deployment archive, push to Nexus, create evidence
+# ============================================================
+
+.archive_template:
+  stage: archive
+  script:
+    - echo "Archiving deployment for ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata.yaml 2>&1 | tee archive.log
+    - |
+      EXIT_CODE=${PIPESTATUS[0]}
+      echo ""
+      echo "Archive exit code: $EXIT_CODE"
+      exit $EXIT_CODE
+    - echo "${DEPLOY_ENV} deployment complete"
+  artifacts:
+    paths:
+      - archives/*.zip
+      - evidence/*.zip
+      - archive.log
+      - boms/baseline.yaml
+      - boms/functional.yaml
+
+archive:test:
+  extends: .archive_template
+  variables:
+    DEPLOY_ENV: "TEST"
+  dependencies:
+    - extract:test
   artifacts:
     expire_in: 30 days
   rules:
@@ -165,10 +275,12 @@ deploy:test:
         - boms/baseline.yaml
         - boms/functional.yaml
 
-deploy:staging:
-  extends: .deploy_template
+archive:staging:
+  extends: .archive_template
   variables:
     DEPLOY_ENV: "STAGING"
+  dependencies:
+    - extract:staging
   artifacts:
     expire_in: 90 days
   rules:
@@ -177,14 +289,14 @@ deploy:staging:
         - boms/baseline.yaml
         - boms/functional.yaml
 
-deploy:prod:
-  extends: .deploy_template
+archive:prod:
+  extends: .archive_template
   variables:
     DEPLOY_ENV: "PROD"
+  dependencies:
+    - extract:prod
   artifacts:
     expire_in: 1 year
-  dependencies:
-    - review:prod
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
