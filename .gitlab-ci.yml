@@ -363,8 +363,6 @@ archive:prod:
 
       exit $ROLLBACK_EXIT_CODE
     - echo "${DEPLOY_ENV} rollback complete"
-  when: manual
-  allow_failure: false
   artifacts:
     when: always
     paths:
