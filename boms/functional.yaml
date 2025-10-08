@@ -3,12 +3,12 @@
 # Use for: Sprint releases, feature deployments, bug fixes
 
 # Required fields
-version: "1.0.1"
+version: "1.0.2"
 change_request: "CR-12345"
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
-description: "Test pipeline - workflow validation"
+description: "Test pipeline - git diff detection validation"
 created_by: "fadzi"
 
 # Required: Specific entities to deploy
