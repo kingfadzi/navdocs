@@ -1,0 +1,146 @@
+# PPM Rollback Pipeline
+# Separate pipeline for emergency rollbacks
+# Triggered manually via GitLab UI with required variables
+
+# Only run when explicitly triggered with ROLLBACK_TRIGGER variable
+workflow:
+  rules:
+    - if: '$ROLLBACK_TRIGGER == "true"'
+
+stages:
+  - validate
+  - review
+  - rollback
+
+# Default configuration
+default:
+  image: python:3.11-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git
+    - pip install PyYAML --quiet
+
+# Required variables (set when manually triggering pipeline):
+# - ROLLBACK_TRIGGER: "true" (enables this pipeline)
+# - ENVIRONMENT: "test" or "prod"
+# - ROLLBACK_ARTIFACT: Full Nexus URL to artifact (e.g., "nexus://repo/CR123-v1.2.3-bundles.zip")
+
+# ============================================================
+# STAGE 1: VALIDATE
+# Verify inputs and artifact availability
+# ============================================================
+
+validate:inputs:
+  stage: validate
+  script:
+    - echo "============================================================"
+    - echo "ROLLBACK VALIDATION"
+    - echo "============================================================"
+    - echo ""
+    - echo "Environment: ${ENVIRONMENT}"
+    - echo "Artifact: ${ROLLBACK_ARTIFACT}"
+    - echo ""
+    - |
+      # Validate ENVIRONMENT
+      if [ "$ENVIRONMENT" != "test" ] && [ "$ENVIRONMENT" != "prod" ]; then
+        echo "ERROR: ENVIRONMENT must be 'test' or 'prod'"
+        echo "Got: $ENVIRONMENT"
+        exit 1
+      fi
+
+      # Validate ROLLBACK_ARTIFACT is provided
+      if [ -z "$ROLLBACK_ARTIFACT" ]; then
+        echo "ERROR: ROLLBACK_ARTIFACT variable is required"
+        echo "Example: nexus://repo/CR123-v1.2.3-bundles.zip"
+        exit 1
+      fi
+
+      echo "✓ Environment valid: $ENVIRONMENT"
+      echo "✓ Artifact specified: $ROLLBACK_ARTIFACT"
+    - echo ""
+    - echo "Validation passed"
+
+# ============================================================
+# STAGE 2: REVIEW (Prod Only)
+# Manual approval gate for production rollbacks
+# ============================================================
+
+review:rollback:
+  stage: review
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION ROLLBACK REVIEW"
+    - echo "============================================================"
+    - echo ""
+    - echo "⚠️  WARNING: Production rollback requested"
+    - echo ""
+    - echo "Environment: ${ENVIRONMENT}"
+    - echo "Rollback to: ${ROLLBACK_ARTIFACT}"
+    - echo ""
+    - echo "Review and verify:"
+    - echo "  - Correct artifact URL"
+    - echo "  - Change request approved for rollback"
+    - echo "  - Stakeholders notified"
+    - echo ""
+    - echo "Click 'Approve' to proceed with rollback."
+    - echo "============================================================"
+  when: manual
+  allow_failure: false
+  rules:
+    - if: '$ENVIRONMENT == "prod"'
+
+# ============================================================
+# STAGE 3: ROLLBACK
+# Execute rollback using specified artifact
+# ============================================================
+
+execute:rollback:
+  stage: rollback
+  script:
+    - echo "============================================================"
+    - echo "EXECUTING ROLLBACK"
+    - echo "============================================================"
+    - echo ""
+    - echo "Environment: ${ENVIRONMENT}"
+    - echo "Artifact: ${ROLLBACK_ARTIFACT}"
+    - echo ""
+    - |
+      # Create temporary BOM file for rollback
+      cat > /tmp/rollback-bom.yaml <<EOF
+      version: "rollback"
+      change_request: "emergency-rollback"
+      profile: "functional-release"
+      source_server: "${ENVIRONMENT}"
+      target_server: "${ENVIRONMENT}"
+      rollback_artifact: "${ROLLBACK_ARTIFACT}"
+      entities: []
+      EOF
+
+      echo "Generated temporary BOM:"
+      cat /tmp/rollback-bom.yaml
+      echo ""
+
+      # Execute rollback
+      python3 tools/deploy.py rollback --bom /tmp/rollback-bom.yaml 2>&1 | tee rollback.log
+
+      # Capture exit code
+      ROLLBACK_EXIT_CODE=${PIPESTATUS[0]}
+
+      echo ""
+      echo "Rollback exit code: $ROLLBACK_EXIT_CODE"
+
+      exit $ROLLBACK_EXIT_CODE
+    - echo ""
+    - echo "============================================================"
+    - echo "ROLLBACK COMPLETE"
+    - echo "============================================================"
+  artifacts:
+    when: always
+    paths:
+      - rollback.log
+      - evidence/*.zip
+    expire_in: 1 year
+  dependencies:
+    - review:rollback
+  rules:
+    - if: '$ENVIRONMENT == "prod"'
+    - if: '$ENVIRONMENT == "test"'
