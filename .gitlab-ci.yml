@@ -65,20 +65,18 @@ validate:bom:
 # STAGE 2: REVIEW (Prod Only)
 review:prod:baseline:
   stage: review_baseline
-  script: |
-    echo "============================================================"
-    echo "PRODUCTION DEPLOYMENT REVIEW (BASELINE)"
-    echo "============================================================"
-    echo "BOM pending deployment: boms/baseline.yaml (baseline-repave)"
-    cat boms/baseline.yaml
-    echo ""
-    echo "Review the BOM file in this MR to verify:"
-    echo "  - Correct target server (prod)"
-    echo "  - Proper rollback_artifact specified"
-    echo "  - Change request approved"
-    echo ""
-    echo "Click 'Approve' to proceed with baseline deployment."
-    echo "============================================================"
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION DEPLOYMENT REVIEW (BASELINE)"
+    - echo "============================================================"
+    - echo "BOM pending deployment boms/baseline.yaml (baseline-repave)"
+    - cat boms/baseline.yaml
+    - echo "Review the BOM file in this MR to verify"
+    - echo "  - Correct target server (prod)"
+    - echo "  - Proper rollback_artifact specified"
+    - echo "  - Change request approved"
+    - echo "Click 'Approve' to proceed with baseline deployment."
+    - echo "============================================================"
   when: manual
   allow_failure: false
   rules:
@@ -215,21 +213,19 @@ archive:prod:baseline:
 # STAGE 6: REVIEW (Prod Only)
 review:prod:functional:
   stage: review_functional
-  script: |
-    echo "============================================================"
-    echo "PRODUCTION DEPLOYMENT REVIEW (FUNCTIONAL)"
-    echo "============================================================"
-    echo "BOM pending deployment: boms/functional.yaml (functional-release)"
-    cat boms/functional.yaml
-    echo ""
-    echo "Review the BOM file in this MR to verify:"
-    echo "  - Correct target server (prod)"
-    echo "  - Correct entities and reference codes"
-    echo "  - Proper rollback_artifact specified"
-    echo "  - Change request approved"
-    echo ""
-    echo "Click 'Approve' to proceed with functional deployment."
-    echo "============================================================"
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION DEPLOYMENT REVIEW (FUNCTIONAL)"
+    - echo "============================================================"
+    - echo "BOM pending deployment boms/functional.yaml (functional-release)"
+    - cat boms/functional.yaml
+    - echo "Review the BOM file in this MR to verify"
+    - echo "  - Correct target server (prod)"
+    - echo "  - Correct entities and reference codes"
+    - echo "  - Proper rollback_artifact specified"
+    - echo "  - Change request approved"
+    - echo "Click 'Approve' to proceed with functional deployment."
+    - echo "============================================================"
   when: manual
   allow_failure: false
   rules:
