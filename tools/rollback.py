@@ -33,16 +33,21 @@ def download_gitlab_artifacts_from_pipeline(pipeline_id, output_dir):
     Returns:
         Path to the extracted artifacts directory
 
-    Uses CI_JOB_TOKEN (in pipeline) or GITLAB_TOKEN (manual) for authentication.
+    Uses CI_JOB_TOKEN (in pipeline) or GITLAB_API_TOKEN (manual) for authentication.
     Works with both GitLab.com and on-prem GitLab (uses CI_API_V4_URL).
     """
     import json
 
-    # Get GitLab credentials
-    gitlab_token = os.environ.get('CI_JOB_TOKEN') or os.environ.get('GITLAB_TOKEN')
-    if not gitlab_token:
+    # Get GitLab credentials and determine authentication header type
+    if os.environ.get('CI_JOB_TOKEN'):
+        gitlab_token = os.environ.get('CI_JOB_TOKEN')
+        auth_header = 'JOB-TOKEN'  # CI pipeline token
+    elif os.environ.get('GITLAB_API_TOKEN'):
+        gitlab_token = os.environ.get('GITLAB_API_TOKEN')
+        auth_header = 'PRIVATE-TOKEN'  # Personal access token
+    else:
         print("Error: No GitLab authentication found")
-        print("Set CI_JOB_TOKEN (automatic in pipeline) or GITLAB_TOKEN (for manual use)")
+        print("Set CI_JOB_TOKEN (automatic in pipeline) or GITLAB_API_TOKEN (for manual use)")
         sys.exit(1)
 
     # Get project info from environment
@@ -70,7 +75,7 @@ def download_gitlab_artifacts_from_pipeline(pipeline_id, output_dir):
 
     cmd = [
         'curl', '-sS', '--fail',
-        '--header', f'PRIVATE-TOKEN: {gitlab_token}',
+        '--header', f'{auth_header}: {gitlab_token}',
         jobs_url
     ]
 
@@ -82,7 +87,7 @@ def download_gitlab_artifacts_from_pipeline(pipeline_id, output_dir):
         print()
         print("Tips:")
         print(f"  - Verify pipeline ID {pipeline_id} exists")
-        print("  - Check you have access to the project")
+        print(f"  - Check you have access to the project")
         print(f"  - View in GitLab: {gitlab_api_url.replace('/api/v4', '')}/pipelines/{pipeline_id}")
         sys.exit(1)
 
@@ -114,7 +119,7 @@ def download_gitlab_artifacts_from_pipeline(pipeline_id, output_dir):
 
     cmd = [
         'curl', '-sS', '--fail',
-        '--header', f'JOB-TOKEN: {gitlab_token}',
+        '--header', f'{auth_header}: {gitlab_token}',
         '--output', str(temp_zip),
         artifacts_url
     ]

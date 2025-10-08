@@ -257,7 +257,7 @@ rollback_pipeline_id: 12345  # Pipeline ID from previous successful deployment
 # Set credentials
 export PPM_USERNAME=your_username
 export PPM_PASSWORD=your_password
-export GITLAB_TOKEN=your_gitlab_token  # Or use CI_JOB_TOKEN in CI
+export GITLAB_API_TOKEN=your_gitlab_token  # Or use CI_JOB_TOKEN in CI
 
 # Rollback using BOM
 python3 tools/deploy.py rollback --bom boms/functional.yaml
