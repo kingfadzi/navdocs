@@ -3,12 +3,12 @@
 # Use for: Initial environment setup OR periodic alignment
 
 # Required fields
-version: "1.0.1"
+version: "1.0.2"
 profile: baseline
-source_server: test-ppm-useast
-target_server: dev-ppm-useast  # Change to: dev-ppm-useast, test-ppm-useast, or prod-ppm-useast
-description: "Baseline deployment template - update before use"
-created_by: "platform-team"
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
+description: "Test baseline deployment dev to test"
+created_by: "fadzi"
 
 # Optional metadata
 # change_request: "OPS-12345"  # Recommended for prod
