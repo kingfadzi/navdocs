@@ -6,8 +6,8 @@
 version: "1.0.4"
 change_request: "CR-12345"
 profile: functional-cd
-source_server: test-ppm-useast
-target_server: staging-ppm-useast
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
 description: "Staging deployment - workflow release"
 created_by: "fadzi"
 
