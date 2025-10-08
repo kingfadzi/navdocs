@@ -14,9 +14,9 @@ deployment_promotion_order:
   severity: blocking
   # Define promotion sequence - strict sequential promotion enforced (no skipping)
   # Each deployment must go to the NEXT environment in sequence only
-  # Current environments: dev -> test -> prod
-  sequence: [dev, test, prod]
-  message: "Deployments must follow strict promotion order: dev → test → prod (no skipping)"
+  # Current environments: dev -> test -> staging -> prod
+  sequence: [dev, test, staging, prod]
+  message: "Deployments must follow strict promotion order: dev → test → staging → prod (no skipping)"
 
 # All deployments require rollback capability
 require_prod_rollback:
@@ -51,17 +51,17 @@ require_branch_environment_match:
   severity: blocking
   message: "BOM target_server does not match branch environment"
   mappings:
-    # feature/* branches can only deploy to dev
+    # feature/* branches deploy FROM dev TO test
     feature:
-      allowed_env_types: [dev]
-
-    # develop branch can only deploy to test
-    develop:
       allowed_env_types: [test]
 
-    # main branch can only deploy to prod (and staging if exists)
+    # develop branch deploys FROM test TO staging
+    develop:
+      allowed_env_types: [staging]
+
+    # main branch deploys FROM staging TO prod
     main:
-      allowed_env_types: [prod, staging]
+      allowed_env_types: [prod]
 
 # Prevent multiple BOM changes in single commit (fail fast)
 prevent_multiple_bom_changes:

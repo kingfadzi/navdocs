@@ -37,6 +37,12 @@ servers:
     credential_path: "/secrets/ppm-test"
     region: useast
 
+  staging-ppm-useast:
+    url: "https://ppm-staging.company.com"
+    env_type: staging
+    credential_path: "/secrets/ppm-staging"
+    region: useast
+
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
     env_type: prod

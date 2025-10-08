@@ -147,10 +147,10 @@ review:prod:
       - archives/*.zip
       - evidence/*.zip
 
-deploy:dev:
+deploy:test:
   extends: .deploy_template
   variables:
-    DEPLOY_ENV: "DEV"
+    DEPLOY_ENV: "TEST"
   artifacts:
     expire_in: 30 days
   rules:
@@ -159,10 +159,10 @@ deploy:dev:
         - boms/baseline.yaml
         - boms/functional.yaml
 
-deploy:test:
+deploy:staging:
   extends: .deploy_template
   variables:
-    DEPLOY_ENV: "TEST"
+    DEPLOY_ENV: "STAGING"
   artifacts:
     expire_in: 90 days
   rules:
@@ -239,20 +239,20 @@ deploy:prod:
       - evidence/*.zip
     expire_in: 1 year
 
-rollback:dev:
+rollback:test:
   extends: .rollback_template
   variables:
-    DEPLOY_ENV: "DEV"
+    DEPLOY_ENV: "TEST"
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - boms/baseline.yaml
         - boms/functional.yaml
 
-rollback:test:
+rollback:staging:
   extends: .rollback_template
   variables:
-    DEPLOY_ENV: "TEST"
+    DEPLOY_ENV: "STAGING"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
