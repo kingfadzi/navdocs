@@ -3,7 +3,7 @@
 # Use for: Sprint releases, feature deployments, bug fixes
 
 # Required fields
-version: "1.0.7"
+version: "1.0.8"
 change_request: "CR-12345"
 profile: functional-cd
 source_server: dev-ppm-useast
