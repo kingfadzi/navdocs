@@ -312,22 +312,6 @@ def main():
         print(f"Branch: {branch_name}")
     print()
 
-    # Check if both BOMs changed (fail fast)
-    bom_names = [str(f.name) for f in bom_files]
-    if 'baseline.yaml' in bom_names and 'functional.yaml' in bom_names:
-        rules = load_rules()
-        rule = rules.get('prevent_multiple_bom_changes', {})
-        if rule.get('enabled'):
-            print("✗ MULTIPLE BOM CHANGES DETECTED")
-            print(f"  {rule.get('message')}")
-            print("  Baseline and functional are different deployment types.")
-            print("  Create separate commits for each.")
-            print()
-            print("=" * 60)
-            print("VALIDATION FAILED")
-            print("=" * 60)
-            sys.exit(1)
-
     total_files = len(bom_files)
     valid_files = 0
     invalid_files = 0

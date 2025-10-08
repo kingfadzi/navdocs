@@ -3,7 +3,7 @@
 # Use for: Initial environment setup OR periodic alignment
 
 # Required fields
-version: "1.0.6"
+version: "1.0.7"
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
