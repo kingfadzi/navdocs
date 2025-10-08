@@ -8,35 +8,22 @@ version: "1.0.0"
 # CRITICAL RULES (Day 1)
 # ==============================================================================
 
-# Prevent invalid deployment flow
-prohibited_deployment_paths:
+# Enforce sequential deployment promotion order
+deployment_promotion_order:
   enabled: true
   severity: blocking
-  paths:
-    # Reverse flow - prevents data leaks from higher to lower environments
-    - source: prod
-      target: [dev, test, uat, staging]
-      reason: "Cannot copy production data to lower environments"
+  # Define promotion sequence - strict sequential promotion enforced (no skipping)
+  # Each deployment must go to the NEXT environment in sequence only
+  # Current environments: dev -> test -> prod
+  sequence: [dev, test, prod]
+  message: "Deployments must follow strict promotion order: dev → test → prod (no skipping)"
 
-    - source: staging
-      target: [dev, test, uat]
-      reason: "Cannot copy staging data to lower environments"
-
-    # Lateral flow - prevents backwards/sideways deployment
-    - source: test
-      target: [dev]
-      reason: "Cannot reverse deployment flow"
-
-    - source: uat
-      target: [dev]
-      reason: "Cannot reverse deployment flow"
-
-# Production deployments require rollback capability
+# All deployments require rollback capability
 require_prod_rollback:
   enabled: true
-  applies_to: [prod, staging]
+  applies_to: [dev, test, uat, staging, prod]
   severity: blocking
-  message: "Production deployments must specify rollback_artifact"
+  message: "All deployments must specify rollback_artifact (enables recovery from mistakes)"
 
 # Production deployments require change request
 require_prod_change_request:

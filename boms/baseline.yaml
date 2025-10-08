@@ -9,7 +9,7 @@ source_server: dev-ppm-useast
 target_server: test-ppm-useast
 description: "Test baseline deployment dev to test"
 created_by: "fadzi"
-
-# Optional metadata
 # change_request: "OPS-12345"  # Recommended for prod
-# rollback_artifact: "nexus://..."  # Required for prod
+
+rollback_artifact: "nexus://ppm-deployments/baseline/baseline-v1.0.1-20251007-080000-bundles.zip"
+

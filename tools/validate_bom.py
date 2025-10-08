@@ -52,17 +52,25 @@ def check_rules(bom, config, rules, branch_name=None):
     source_env = servers.get(source, {}).get('env_type', '')
     target_env = servers.get(target, {}).get('env_type', '')
 
-    # RULE 1: Prohibited deployment paths
-    rule = rules.get('prohibited_deployment_paths', {})
+    # RULE 1: Sequential deployment promotion order (strict - no skipping)
+    rule = rules.get('deployment_promotion_order', {})
     if rule.get('enabled'):
-        paths = rule.get('paths', [])
-        for path in paths:
-            source_match = source_env == path['source']
-            target_match = target_env in path['target']
-            if source_match and target_match:
-                reason = path.get('reason', 'Deployment path not allowed')
-                errors.append(f"{reason} ({source_env} → {target_env})")
-                break
+        sequence = rule.get('sequence', [])
+
+        # Only validate if both source and target are in the sequence
+        if source_env in sequence and target_env in sequence:
+            source_idx = sequence.index(source_env)
+            target_idx = sequence.index(target_env)
+
+            # Must deploy to next environment in sequence only
+            if target_idx != source_idx + 1:
+                if target_idx <= source_idx:
+                    # Backward or same environment deployment
+                    errors.append(f"{rule.get('message', 'Invalid deployment order')} ({source_env} → {target_env})")
+                else:
+                    # Skipping environments
+                    expected_next = sequence[source_idx + 1]
+                    errors.append(f"{rule.get('message', 'Invalid deployment order')} - Must deploy to {expected_next} next ({source_env} → {target_env})")
 
     # RULE 2: Prod needs rollback
     rule = rules.get('require_prod_rollback', {})

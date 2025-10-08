@@ -185,3 +185,88 @@ deploy:prod:
         - boms/baseline.yaml
         - boms/functional.yaml
 
+# ============================================================
+# ROLLBACK JOBS
+# Manual rollback triggered within deployment pipeline
+# Uses rollback_artifact from the same BOM that was deployed
+# ============================================================
+
+# Hidden template for all rollback jobs
+.rollback_template:
+  stage: deploy
+  script:
+    - echo "Rolling back ${DEPLOY_ENV} environment..."
+    - |
+      # Detect which BOM changed (same logic as deployment)
+      BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
+      FUNCTIONAL_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/functional.yaml$" || true)
+
+      if [ $BASELINE_CHANGED -gt 0 ] && [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        echo "ERROR: Both BOMs changed - cannot determine which to rollback"
+        exit 1
+      fi
+
+      # Determine which BOM to use for rollback
+      if [ $BASELINE_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/baseline.yaml"
+      elif [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/functional.yaml"
+      else
+        echo "No BOM changes detected"
+        exit 0
+      fi
+
+      echo "Rollback BOM: $BOM_FILE"
+      echo ""
+
+      # Execute rollback using rollback_artifact from BOM
+      python3 tools/deploy.py rollback --bom "$BOM_FILE" 2>&1 | tee rollback.log
+
+      # Capture exit code
+      ROLLBACK_EXIT_CODE=${PIPESTATUS[0]}
+
+      echo ""
+      echo "Rollback exit code: $ROLLBACK_EXIT_CODE"
+
+      exit $ROLLBACK_EXIT_CODE
+    - echo "${DEPLOY_ENV} rollback complete"
+  when: manual
+  allow_failure: false
+  artifacts:
+    when: always
+    paths:
+      - rollback.log
+      - evidence/*.zip
+    expire_in: 1 year
+
+rollback:dev:
+  extends: .rollback_template
+  variables:
+    DEPLOY_ENV: "DEV"
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+rollback:test:
+  extends: .rollback_template
+  variables:
+    DEPLOY_ENV: "TEST"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+
+rollback:prod:
+  extends: .rollback_template
+  variables:
+    DEPLOY_ENV: "PROD"
+  dependencies:
+    - review:prod
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
