@@ -89,16 +89,12 @@ review:prod:baseline:
   stage: extract_baseline
   script:
     - echo "Extracting entities for BASELINE deployment to ${DEPLOY_ENV}..."
-    - echo "BOM: boms/baseline.yaml"
-    - python3 tools/deploy.py extract --bom "boms/baseline.yaml" --skip-validation 2>&1 | tee extract_baseline.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Extract exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
+    - echo "BOM boms/baseline.yaml"
+    - python3 tools/deploy.py extract --bom "boms/baseline.yaml" --skip-validation
   artifacts:
     paths:
       - bundles/baseline-*.xml
       - bundles/deployment-metadata-baseline.yaml
-      - extract_baseline.log
     expire_in: 7 days
 
 extract:test:baseline:
@@ -128,14 +124,7 @@ extract:prod:baseline:
   stage: import_baseline
   script:
     - echo "Importing BASELINE bundles to ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-baseline.yaml 2>&1 | tee import_baseline.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Import exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
-  artifacts:
-    when: always
-    paths: [ "import_baseline.log" ]
-    expire_in: 30 days
+    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-baseline.yaml
 
 import:test:baseline:
   extends: .import_baseline_template
@@ -167,15 +156,11 @@ import:prod:baseline:
   stage: archive_baseline
   script:
     - echo "Archiving BASELINE deployment for ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-baseline.yaml 2>&1 | tee archive_baseline.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Archive exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
+    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-baseline.yaml
   artifacts:
     paths:
       - archives/baseline-*.zip
       - evidence/baseline-*.zip
-      - archive_baseline.log
       - ROLLBACK_MANIFEST_BASELINE.yaml
 
 archive:test:baseline:
@@ -238,16 +223,12 @@ review:prod:functional:
   stage: extract_functional
   script:
     - echo "Extracting entities for FUNCTIONAL deployment to ${DEPLOY_ENV}..."
-    - echo "BOM: boms/functional.yaml"
-    - python3 tools/deploy.py extract --bom "boms/functional.yaml" --skip-validation 2>&1 | tee extract_functional.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Extract exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
+    - echo "BOM boms/functional.yaml"
+    - python3 tools/deploy.py extract --bom "boms/functional.yaml" --skip-validation
   artifacts:
     paths:
       - bundles/functional-*.xml
       - bundles/deployment-metadata-functional.yaml
-      - extract_functional.log
     expire_in: 7 days
 
 extract:test:functional:
@@ -277,14 +258,7 @@ extract:prod:functional:
   stage: import_functional
   script:
     - echo "Importing FUNCTIONAL bundles to ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-functional.yaml 2>&1 | tee import_functional.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Import exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
-  artifacts:
-    when: always
-    paths: [ "import_functional.log" ]
-    expire_in: 30 days
+    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-functional.yaml
 
 import:test:functional:
   extends: .import_functional_template
@@ -316,15 +290,11 @@ import:prod:functional:
   stage: archive_functional
   script:
     - echo "Archiving FUNCTIONAL deployment for ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-functional.yaml 2>&1 | tee archive_functional.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Archive exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
+    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-functional.yaml
   artifacts:
     paths:
       - archives/functional-*.zip
       - evidence/functional-*.zip
-      - archive_functional.log
       - ROLLBACK_MANIFEST_FUNCTIONAL.yaml
 
 archive:test:functional:
@@ -374,15 +344,8 @@ archive:prod:functional:
   when: manual
   script:
     - echo "Rolling back BASELINE deployment for ${DEPLOY_ENV}..."
-    - echo "Rollback BOM: boms/baseline.yaml"
-    - python3 tools/deploy.py rollback --bom "boms/baseline.yaml" 2>&1 | tee rollback_baseline.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Rollback exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
-  artifacts:
-    when: always
-    paths: [ "rollback_baseline.log" ]
-    expire_in: 1 year
+    - echo "Rollback BOM boms/baseline.yaml"
+    - python3 tools/deploy.py rollback --bom "boms/baseline.yaml"
 
 .rollback_functional_template:
   stage: .post
@@ -399,15 +362,8 @@ archive:prod:functional:
   when: manual
   script:
     - echo "Rolling back FUNCTIONAL deployment for ${DEPLOY_ENV}..."
-    - echo "Rollback BOM: boms/functional.yaml"
-    - python3 tools/deploy.py rollback --bom "boms/functional.yaml" 2>&1 | tee rollback_functional.log
-    - EXIT_CODE=${PIPESTATUS[0]}
-    - echo "Rollback exit code: $EXIT_CODE"
-    - exit $EXIT_CODE
-  artifacts:
-    when: always
-    paths: [ "rollback_functional.log" ]
-    expire_in: 1 year
+    - echo "Rollback BOM boms/functional.yaml"
+    - python3 tools/deploy.py rollback --bom "boms/functional.yaml"
 
 # Rollback job definitions
 rollback:test:baseline:
