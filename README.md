@@ -146,7 +146,11 @@ Rules can be enabled/disabled individually by editing `config/rules.yaml`.
 ### Baseline Repave
 Deploy ALL baseline entities (full sync). Use for initial setup or periodic alignment.
 
-**Create a baseline BOM** (`boms/baseline-dev-to-test.yaml`):
+**Edit baseline BOM:**
+```bash
+vim boms/baseline.yaml
+```
+
 ```yaml
 version: "1.0.0"
 profile: baseline
@@ -167,7 +171,7 @@ export PPM_USERNAME=your_username
 export PPM_PASSWORD=your_password
 
 # Deploy using BOM
-python3 tools/deploy.py baseline-repave --bom boms/baseline-dev-to-test.yaml
+python3 tools/deploy.py baseline-repave --bom boms/baseline.yaml
 ```
 
 **What it does:**
@@ -184,7 +188,11 @@ python3 tools/deploy.py baseline-repave --bom boms/baseline-dev-to-test.yaml
 ### Functional Release
 Deploy SPECIFIC functional entities (selective). Use for sprint releases and feature deployments.
 
-**Create a functional BOM** (`boms/release-2025.10.yaml`):
+**Edit functional BOM:**
+```bash
+vim boms/functional.yaml
+```
+
 ```yaml
 version: "2.0.0"
 change_request: "CR-54321"
@@ -216,7 +224,7 @@ export PPM_USERNAME=your_username
 export PPM_PASSWORD=your_password
 
 # Deploy using BOM
-python3 tools/deploy.py functional-release --bom boms/release-2025.10.yaml
+python3 tools/deploy.py functional-release --bom boms/functional.yaml
 ```
 
 **What it does:**
@@ -237,7 +245,11 @@ Restore a previous deployment using archived artifacts from Nexus.
 - Previous deployment was successful and archived to Nexus
 - BOM has `rollback_artifact` field pointing to Nexus archive
 
-**Example BOM with rollback** (`boms/release-2025.10-rollback.yaml`):
+**Edit functional.yaml for rollback:**
+```bash
+vim boms/functional.yaml
+```
+
 ```yaml
 version: "1.9.0-rollback"
 change_request: "CR-54321-ROLLBACK"
@@ -257,7 +269,7 @@ export PPM_USERNAME=your_username
 export PPM_PASSWORD=your_password
 
 # Rollback using BOM
-python3 tools/deploy.py rollback --bom boms/release-2025.10-rollback.yaml
+python3 tools/deploy.py rollback --bom boms/functional.yaml
 ```
 
 **What it does:**
@@ -338,92 +350,109 @@ Automated deployment pipeline using `tools/deploy.py` with approval gates.
 
 ### **BOM Organization**
 
-Flat structure - environment determined by `target_server` in BOM content:
+**Two static BOM files** - edit in place for deployments:
 
 ```
 boms/
-├── baseline-dev-to-test.yaml
-├── CR-12345-incident-workflow-v1.0.0.yaml
-└── CR-54321-change-workflow-v2.0.0.yaml
+├── baseline.yaml      # Baseline deployments (infrastructure sync)
+└── functional.yaml    # Functional deployments (features/fixes)
 ```
 
-**Naming conventions:**
-- Baseline: `baseline-{description}.yaml`
-- Functional: `{CR}-{description}-{version}.yaml`
-- Rollback: `{CR}-rollback-{version}.yaml`
+**Pipeline only watches these two files.** No other BOMs will trigger deployments.
 
 ### **Deployment Workflow**
 
-#### **1. Create BOM** (Feature Branch)
+#### **1. Edit BOM** (Feature Branch)
 ```bash
 # Create feature branch
 git checkout -b feature/CR-12345-incident-workflow
 
-# Create BOM (flat structure)
-cp boms/release-example.yaml boms/CR-12345-incident-v1.0.0.yaml
+# Edit functional BOM
+vim boms/functional.yaml
+```
 
-# Edit BOM - set target_server to dev-ppm-useast
-vim boms/CR-12345-incident-v1.0.0.yaml
+**Update functional.yaml:**
+```yaml
+version: "1.0.0"
+change_request: "CR-12345"
+profile: functional-cd
+source_server: dev-ppm-useast
+target_server: dev-ppm-useast  # Set to dev for feature branches
+description: "Incident workflow enhancements"
+created_by: "platform-team"
 
-# Validate locally
-python3 tools/validate_bom.py --file boms/CR-12345-incident-v1.0.0.yaml
+entities:
+  - entity_id: 9
+    reference_code: "WF_INCIDENT_MGMT"
+    entity_type: "Workflow"
+```
 
-# Test locally (optional)
+**Validate locally:**
+```bash
+python3 tools/validate_bom.py --file boms/functional.yaml --branch feature/CR-12345
+
+# Test deployment (optional)
 export PPM_USERNAME=testuser
 export PPM_PASSWORD=testpass
-python3 tools/deploy.py functional-release --bom boms/CR-12345-incident-v1.0.0.yaml
+python3 tools/deploy.py functional-release --bom boms/functional.yaml
 ```
 
 #### **2. Create MR** (Dev Deployment)
 ```bash
 # Commit and push
-git add boms/CR-12345-incident-v1.0.0.yaml
-git commit -m "Add BOM for incident workflow v1.0.0 (dev)"
+git add boms/functional.yaml
+git commit -m "Deploy CR-12345 incident workflow to dev"
 git push origin feature/CR-12345-incident-workflow
 
-# Create MR to develop (or main for hotfixes)
-# Use "Deployment" MR template
+# Create MR to develop
 # Request 2 approvals
 ```
 
 **Pipeline runs:**
-- Validate → Deploy (calls `deploy.py functional-release`)
+- Validate → Deploy to dev
 
-#### **3. Promote to Test** (Update BOM)
+#### **3. Promote to Test**
 ```bash
-# After successful dev deployment, promote to test
-# Edit BOM and change target_server from dev-ppm-useast to test-ppm-useast
-vim boms/CR-12345-incident-v1.0.0.yaml
+# Merge to develop
+git checkout develop
+git pull
 
-# Commit and create MR to develop
-git add boms/CR-12345-incident-v1.0.0.yaml
-git commit -m "Promote incident workflow v1.0.0 to test"
+# Edit same BOM, change target
+vim boms/functional.yaml
+# Change: target_server: test-ppm-useast
+
+# Commit and push
+git add boms/functional.yaml
+git commit -m "Promote CR-12345 to test"
 git push
 
-# MR to develop requires 2 approvals
+# Auto-deploys to test (no MR needed if on develop)
 ```
 
 **Pipeline runs:**
-- Validate → Deploy (calls `deploy.py functional-release`)
+- Validate → Deploy to test
 
-#### **4. Promote to Prod** (Copy BOM + Update)
+#### **4. Promote to Prod**
 ```bash
-# After successful test deployment, promote to prod
-# Edit BOM and update:
-#  - target_server: test-ppm-useast → prod-ppm-useast
-#  - rollback_artifact: (add from test deployment archive)
-vim boms/CR-12345-incident-v1.0.0.yaml
+# Merge to main
+git checkout main
+git pull
+
+# Edit same BOM, add rollback artifact
+vim boms/functional.yaml
+# Change: target_server: prod-ppm-useast
+# Add: rollback_artifact: "nexus://..." (from test deployment)
 
 # Commit and create MR to main
-git add boms/CR-12345-incident-v1.0.0.yaml
-git commit -m "Deploy incident workflow v1.0.0 to prod"
+git add boms/functional.yaml
+git commit -m "Deploy CR-12345 to prod"
 git push
 
 # MR to main requires 3+ approvals
 ```
 
 **Pipeline runs:**
-- Validate → **Manual Review** → Deploy (calls `deploy.py functional-release`)
+- Validate → **Manual Review** → Deploy to prod
 
 **Approver reviews:**
 1. Check BOM content in MR (entities, reference codes)
@@ -433,9 +462,12 @@ git push
 
 ### **Rollback**
 
+**Edit functional.yaml with rollback config:**
 ```bash
-# Create rollback BOM
-cat > boms/CR-12345-incident-v0.9.0-rollback.yaml << EOF
+vim boms/functional.yaml
+```
+
+```yaml
 version: "0.9.0-rollback"
 change_request: "CR-12345-ROLLBACK"
 profile: functional-cd
@@ -443,15 +475,20 @@ target_server: prod-ppm-useast
 description: "Rollback incident workflow to v0.9.0"
 created_by: "ops-team"
 
+# Point to previous version artifact
 rollback_artifact: "nexus://ppm-deployments/2025/CR-12300-v0.9.0-...-bundles.zip"
-EOF
 
-# Commit and create MR (same approvals as forward deployment)
-git add boms/CR-12345-incident-v0.9.0-rollback.yaml
+# No entities needed for rollback (uses artifact)
+```
+
+**Deploy rollback:**
+```bash
+git add boms/functional.yaml
 git commit -m "Rollback incident workflow to v0.9.0"
 git push
 
 # MR requires 3+ approvals for prod
+# Pipeline: Validate → Manual Review → Rollback
 ```
 
 ### **Local Validation**
@@ -460,12 +497,12 @@ Before creating MR, validate BOM locally:
 
 ```bash
 # Validate BOM schema and governance rules
-python3 tools/validate_bom.py --file boms/CR-12345-v1.0.0.yaml
+python3 tools/validate_bom.py --file boms/functional.yaml --branch feature/test
 
 # Test deployment with mock scripts
 export PPM_USERNAME=testuser
 export PPM_PASSWORD=testpass
-python3 tools/deploy.py functional-release --bom boms/CR-12345-v1.0.0.yaml
+python3 tools/deploy.py functional-release --bom boms/functional.yaml
 ```
 
 ### **Pipeline Variables** (GitLab CI/CD Settings)

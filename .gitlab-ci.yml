@@ -26,17 +26,26 @@ validate:bom:
   stage: validate
   script:
     - echo "Validating BOM files..."
-    - python3 tools/validate_bom.py --changed-files
+    - echo "Branch: $CI_COMMIT_BRANCH"
+    - echo ""
+    - python3 tools/validate_bom.py --changed-files --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
 
 # ============================================================
 # STAGE 2: REVIEW (Prod Only)
@@ -50,10 +59,17 @@ review:prod:
     - echo "PRODUCTION DEPLOYMENT REVIEW"
     - echo "============================================================"
     - echo ""
-    - echo "BOMs pending deployment:"
-    - find boms -name "*.yaml" -type f 2>/dev/null || echo "No BOMs found"
+    - echo "BOM pending deployment:"
+    - |
+      if git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -q "^boms/baseline.yaml$"; then
+        echo "  - boms/baseline.yaml (baseline-repave)"
+        cat boms/baseline.yaml
+      elif git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -q "^boms/functional.yaml$"; then
+        echo "  - boms/functional.yaml (functional-release)"
+        cat boms/functional.yaml
+      fi
     - echo ""
-    - echo "Review the BOM files in this MR to verify:"
+    - echo "Review the BOM file in this MR to verify:"
     - echo "  - Correct target server (prod)"
     - echo "  - Correct entities and reference codes"
     - echo "  - Proper rollback_artifact specified"
@@ -66,7 +82,8 @@ review:prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
 
 # ============================================================
 # STAGE 3: DEPLOY
@@ -78,96 +95,189 @@ deploy:dev:
   stage: deploy
   script:
     - echo "Deploying to DEV environment..."
+    - echo ""
     - |
-      # Find all BOMs
-      for bom in boms/*.yaml; do
-        if [ -f "$bom" ]; then
-          echo "Processing BOM: $bom"
+      # Check if both BOMs changed (prevent accidental dual deployment)
+      BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
+      FUNCTIONAL_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/functional.yaml$" || true)
 
-          # Determine deployment type from profile in BOM
-          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
-          if [[ "$profile" == "baseline" ]]; then
-            python3 tools/deploy.py baseline-repave --bom "$bom"
-          else
-            python3 tools/deploy.py functional-release --bom "$bom"
-          fi
+      if [ $BASELINE_CHANGED -gt 0 ] && [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        echo "============================================================"
+        echo "ERROR: Both baseline.yaml and functional.yaml changed"
+        echo "============================================================"
+        echo "Baseline and functional are different deployment types."
+        echo "Create separate commits for each deployment type."
+        echo "============================================================"
+        exit 1
+      fi
 
-          echo ""
-        fi
-      done
+      # Determine which static BOM changed
+      if [ $BASELINE_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/baseline.yaml"
+        DEPLOY_TYPE="baseline-repave"
+      elif [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/functional.yaml"
+        DEPLOY_TYPE="functional-release"
+      else
+        echo "No baseline.yaml or functional.yaml changes detected"
+        exit 0
+      fi
+
+      echo "BOM: $BOM_FILE"
+      echo "Deployment type: $DEPLOY_TYPE"
+      echo ""
+
+      # Execute deployment (environment already validated by validate:bom job)
+      python3 tools/deploy.py $DEPLOY_TYPE --bom "$BOM_FILE" 2>&1 | tee deployment.log
+
+      # Capture exit code
+      DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
+
+      echo ""
+      echo "Deployment exit code: $DEPLOY_EXIT_CODE"
+
+      exit $DEPLOY_EXIT_CODE
     - echo "DEV deployment complete"
   artifacts:
+    when: always
     paths:
+      - deployment.log
+      - boms/baseline.yaml
+      - boms/functional.yaml
       - archives/*.zip
+      - evidence/*.zip
     expire_in: 30 days
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
 
 deploy:test:
   stage: deploy
   script:
     - echo "Deploying to TEST environment..."
+    - echo ""
     - |
-      # Find all BOMs
-      for bom in boms/*.yaml; do
-        if [ -f "$bom" ]; then
-          echo "Processing BOM: $bom"
+      # Check if both BOMs changed (prevent accidental dual deployment)
+      BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
+      FUNCTIONAL_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/functional.yaml$" || true)
 
-          # Determine deployment type from profile in BOM
-          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
-          if [[ "$profile" == "baseline" ]]; then
-            python3 tools/deploy.py baseline-repave --bom "$bom"
-          else
-            python3 tools/deploy.py functional-release --bom "$bom"
-          fi
+      if [ $BASELINE_CHANGED -gt 0 ] && [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        echo "============================================================"
+        echo "ERROR: Both baseline.yaml and functional.yaml changed"
+        echo "============================================================"
+        echo "Baseline and functional are different deployment types."
+        echo "Create separate commits for each deployment type."
+        echo "============================================================"
+        exit 1
+      fi
 
-          echo ""
-        fi
-      done
+      # Determine which static BOM changed
+      if [ $BASELINE_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/baseline.yaml"
+        DEPLOY_TYPE="baseline-repave"
+      elif [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/functional.yaml"
+        DEPLOY_TYPE="functional-release"
+      else
+        echo "No baseline.yaml or functional.yaml changes detected"
+        exit 0
+      fi
+
+      echo "BOM: $BOM_FILE"
+      echo "Deployment type: $DEPLOY_TYPE"
+      echo ""
+
+      # Execute deployment (environment already validated by validate:bom job)
+      python3 tools/deploy.py $DEPLOY_TYPE --bom "$BOM_FILE" 2>&1 | tee deployment.log
+
+      # Capture exit code
+      DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
+
+      echo ""
+      echo "Deployment exit code: $DEPLOY_EXIT_CODE"
+
+      exit $DEPLOY_EXIT_CODE
     - echo "TEST deployment complete"
   artifacts:
+    when: always
     paths:
+      - deployment.log
+      - boms/baseline.yaml
+      - boms/functional.yaml
       - archives/*.zip
+      - evidence/*.zip
     expire_in: 90 days
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
 
 deploy:prod:
   stage: deploy
   script:
     - echo "Deploying to PROD environment..."
+    - echo ""
     - |
-      # Find all BOMs
-      for bom in boms/*.yaml; do
-        if [ -f "$bom" ]; then
-          echo "Processing BOM: $bom"
+      # Check if both BOMs changed (prevent accidental dual deployment)
+      BASELINE_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/baseline.yaml$" || true)
+      FUNCTIONAL_CHANGED=$(git diff --name-only $CI_COMMIT_BEFORE_SHA...HEAD | grep -c "^boms/functional.yaml$" || true)
 
-          # Determine deployment type from profile in BOM
-          profile=$(grep -E "^profile:" "$bom" | awk '{print $2}')
-          if [[ "$profile" == "baseline" ]]; then
-            python3 tools/deploy.py baseline-repave --bom "$bom"
-          else
-            python3 tools/deploy.py functional-release --bom "$bom"
-          fi
+      if [ $BASELINE_CHANGED -gt 0 ] && [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        echo "============================================================"
+        echo "ERROR: Both baseline.yaml and functional.yaml changed"
+        echo "============================================================"
+        echo "Baseline and functional are different deployment types."
+        echo "Create separate commits for each deployment type."
+        echo "============================================================"
+        exit 1
+      fi
 
-          echo ""
-        fi
-      done
+      # Determine which static BOM changed
+      if [ $BASELINE_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/baseline.yaml"
+        DEPLOY_TYPE="baseline-repave"
+      elif [ $FUNCTIONAL_CHANGED -gt 0 ]; then
+        BOM_FILE="boms/functional.yaml"
+        DEPLOY_TYPE="functional-release"
+      else
+        echo "No baseline.yaml or functional.yaml changes detected"
+        exit 0
+      fi
+
+      echo "BOM: $BOM_FILE"
+      echo "Deployment type: $DEPLOY_TYPE"
+      echo ""
+
+      # Execute deployment (environment already validated by validate:bom job)
+      python3 tools/deploy.py $DEPLOY_TYPE --bom "$BOM_FILE" 2>&1 | tee deployment.log
+
+      # Capture exit code
+      DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
+
+      echo ""
+      echo "Deployment exit code: $DEPLOY_EXIT_CODE"
+
+      exit $DEPLOY_EXIT_CODE
     - echo "PROD deployment complete"
   artifacts:
+    when: always
     paths:
+      - deployment.log
+      - boms/baseline.yaml
+      - boms/functional.yaml
       - archives/*.zip
+      - evidence/*.zip
     expire_in: 1 year
   dependencies:
     - review:prod
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
-        - boms/*.yaml
+        - boms/baseline.yaml
+        - boms/functional.yaml
 
 # ============================================================
 # ROLLBACK JOBS

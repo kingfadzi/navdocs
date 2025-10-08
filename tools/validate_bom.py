@@ -39,7 +39,7 @@ def load_rules():
     return load_yaml(rules_file)
 
 
-def check_rules(bom, config, rules):
+def check_rules(bom, config, rules, branch_name=None):
     """Apply governance rules. Returns list of errors."""
     errors = []
 
@@ -95,6 +95,31 @@ def check_rules(bom, config, rules):
             if not entities or len(entities) == 0:
                 errors.append(rule.get('message', 'Entities required'))
 
+    # RULE 6: Branch-environment alignment
+    rule = rules.get('require_branch_environment_match', {})
+    if rule.get('enabled') and branch_name:
+        mappings = rule.get('mappings', {})
+
+        # Determine branch type
+        branch_type = None
+        if branch_name.startswith('feature/'):
+            branch_type = 'feature'
+        elif branch_name == 'develop':
+            branch_type = 'develop'
+        elif branch_name == 'main':
+            branch_type = 'main'
+
+        if branch_type and branch_type in mappings:
+            allowed_envs = mappings[branch_type].get('allowed_env_types', [])
+
+            if target_env not in allowed_envs:
+                message = rule.get('message', 'Environment mismatch')
+                errors.append(
+                    f"{message}\n"
+                    f"    Branch: {branch_name} (allows: {', '.join(allowed_envs)})\n"
+                    f"    BOM target_server: {target} (env_type: {target_env})"
+                )
+
     return errors
 
 
@@ -104,9 +129,14 @@ def validate_semantic_version(version):
     return re.match(pattern, version) is not None
 
 
-def validate_bom(bom_file):
+def validate_bom(bom_file, branch_name=None):
     """
     Validate a single BOM file.
+
+    Args:
+        bom_file: Path to BOM file
+        branch_name: Git branch name (for environment validation)
+
     Returns (is_valid, errors[])
     """
     errors = []
@@ -192,7 +222,7 @@ def validate_bom(bom_file):
     config = load_config()
     rules = load_rules()
     if config and rules:
-        errors.extend(check_rules(bom, config, rules))
+        errors.extend(check_rules(bom, config, rules, branch_name))
 
     return len(errors) == 0, errors
 
@@ -225,6 +255,7 @@ def main():
     parser.add_argument('--changed-files', action='store_true',
                         help='Validate only changed BOM files')
     parser.add_argument('--file', help='Validate specific BOM file')
+    parser.add_argument('--branch', help='Git branch name (for environment validation)')
 
     args = parser.parse_args()
 
@@ -241,9 +272,14 @@ def main():
         print("No BOM files to validate")
         return
 
+    # Extract branch name from argument or environment
+    branch_name = args.branch or os.environ.get('CI_COMMIT_BRANCH')
+
     print("=" * 60)
     print("BOM VALIDATION")
     print("=" * 60)
+    if branch_name:
+        print(f"Branch: {branch_name}")
     print()
 
     total_files = len(bom_files)
@@ -253,7 +289,7 @@ def main():
     for bom_file in bom_files:
         print(f"Validating: {bom_file}")
 
-        is_valid, errors = validate_bom(bom_file)
+        is_valid, errors = validate_bom(bom_file, branch_name)
 
         if is_valid:
             print("  ✓ Valid")

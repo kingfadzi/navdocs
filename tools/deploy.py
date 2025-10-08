@@ -143,6 +143,60 @@ def run_import(script_path, url, bundle_file, flags, i18n, refdata):
     print(result.stdout)
 
 
+def create_evidence_package(bom_file, archive_path, config):
+    """
+    Create evidence package for compliance/audit.
+    Bundles: BOM, archive manifest, deployment metadata
+    Returns path to the created evidence package.
+    """
+    root = Path(__file__).parent.parent
+    evidence_dir = root / "evidence"
+    evidence_dir.mkdir(exist_ok=True)
+
+    # Load BOM metadata
+    bom = load_yaml(bom_file)
+    version = bom.get('version', 'unknown')
+    change_request = bom.get('change_request', 'baseline')
+    target_server = bom.get('target_server', 'unknown')
+
+    # Create evidence filename
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    evidence_name = f"{change_request}-{target_server}-{timestamp}-evidence.zip"
+    evidence_path = evidence_dir / evidence_name
+
+    print(f"Creating evidence package: {evidence_name}")
+
+    with zipfile.ZipFile(evidence_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # BOM snapshot
+        zipf.write(bom_file, arcname="bom-deployed.yaml")
+        print(f"  Added: bom-deployed.yaml")
+
+        # Copy manifest from deployment archive
+        if Path(archive_path).exists():
+            with zipfile.ZipFile(archive_path, 'r') as archive_zip:
+                manifest_content = archive_zip.read("manifest.yaml")
+                zipf.writestr("archive-manifest.yaml", manifest_content)
+                print(f"  Added: archive-manifest.yaml")
+
+        # Metadata with CI/CD context
+        metadata = {
+            'bom_file': str(bom_file),
+            'archive_path': str(archive_path),
+            'deployment_timestamp': datetime.now().isoformat(),
+            'ci_commit_sha': os.environ.get('CI_COMMIT_SHA', 'local'),
+            'ci_commit_branch': os.environ.get('CI_COMMIT_BRANCH', 'local'),
+            'ci_pipeline_id': os.environ.get('CI_PIPELINE_ID', 'local'),
+            'ci_pipeline_url': os.environ.get('CI_PIPELINE_URL', 'local'),
+            'ci_job_url': os.environ.get('CI_JOB_URL', 'local'),
+            'deployed_by': os.environ.get('GITLAB_USER_LOGIN', os.environ.get('USER', 'unknown'))
+        }
+        zipf.writestr("metadata.yaml", yaml.dump(metadata, default_flow_style=False))
+        print(f"  Added: metadata.yaml")
+
+    print(f"Evidence package created: {evidence_path}")
+    return evidence_path
+
+
 def archive_deployment(bundles, bom_file, flags, config):
     """
     Create a ZIP archive with bundles + BOM + flags for rollback.
@@ -312,6 +366,14 @@ def baseline_repave(bom_file):
     push_to_nexus(archive_path, bom_file, config)
     print()
 
+    # Create evidence package
+    print("=" * 60)
+    print("CREATING EVIDENCE PACKAGE")
+    print("=" * 60)
+    print()
+    create_evidence_package(bom_file, archive_path, config)
+    print()
+
     # Cleanup
     print("Cleaning up temporary files...")
     for bundle in bundles:
@@ -410,6 +472,14 @@ def functional_release(bom_file):
 
     archive_path = archive_deployment(bundles, bom_file, flags, config)
     push_to_nexus(archive_path, bom_file, config)
+    print()
+
+    # Create evidence package
+    print("=" * 60)
+    print("CREATING EVIDENCE PACKAGE")
+    print("=" * 60)
+    print()
+    create_evidence_package(bom_file, archive_path, config)
     print()
 
     # Cleanup

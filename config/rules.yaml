@@ -57,6 +57,25 @@ require_entities_functional:
   severity: blocking
   message: "Functional deployments must specify entities[]"
 
+# Branch-environment alignment
+# Ensures BOM target_server matches the branch deployment environment
+require_branch_environment_match:
+  enabled: true
+  severity: blocking
+  message: "BOM target_server does not match branch environment"
+  mappings:
+    # feature/* branches can only deploy to dev
+    feature:
+      allowed_env_types: [dev]
+
+    # develop branch can only deploy to test
+    develop:
+      allowed_env_types: [test]
+
+    # main branch can only deploy to prod (and staging if exists)
+    main:
+      allowed_env_types: [prod, staging]
+
 # ==============================================================================
 # FUTURE RULES (Disabled by default - enable when ready)
 # ==============================================================================
