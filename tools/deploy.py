@@ -79,7 +79,7 @@ def run_extract(script_path, url, entity_id, reference_code=None):
 
     # Build command
     cmd = [
-        'sh', script_path,
+        'bash', script_path,
         '-username', username,
         '-password', password,
         '-url', url,
@@ -122,7 +122,7 @@ def run_import(script_path, url, bundle_file, flags, i18n, refdata):
 
     # Build command
     cmd = [
-        'sh', script_path,
+        'bash', script_path,
         '-username', username,
         '-password', password,
         '-url', url,
