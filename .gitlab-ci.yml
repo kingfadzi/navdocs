@@ -76,8 +76,6 @@ deploy_baseline:
     DEPLOYMENT_TYPE: baseline
   rules:
     - if: '$BASELINE_ENABLED == "true"'
-      changes:
-        - boms/deployment.yaml
 
 deploy_functional:
   stage: deploy
@@ -90,5 +88,3 @@ deploy_functional:
     DEPLOYMENT_TYPE: functional
   rules:
     - if: '$FUNCTIONAL_ENABLED == "true"'
-      changes:
-        - boms/deployment.yaml
