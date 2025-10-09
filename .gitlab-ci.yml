@@ -1,17 +1,10 @@
-# PPM Deployment Pipeline
-# Lean CI/CD pipeline using existing deploy.py script
+# PPM Deployment Pipeline - Dynamic Child Pipeline Architecture
+# Generates child pipeline based on which BOMs changed and target environment
 
 stages:
   - validate
-  - review_baseline
-  - extract_baseline
-  - import_baseline
-  - archive_baseline
-  - review_functional
-  - extract_functional
-  - import_functional
-  - archive_functional
-  - .post
+  - generate
+  - deploy
 
 # Default configuration
 default:
@@ -28,17 +21,16 @@ default:
 variables:
   BOM_DIR: "boms"
 
-
 # ============================================================
 # STAGE 1: VALIDATE
-# Validates BOM schema and required fields for one or both BOMs
+# Validates BOM schema and required fields
 # ============================================================
 
 validate:bom:
   stage: validate
   script:
     - echo "Validating BOM files..."
-    - echo "Branch:$CI_COMMIT_BRANCH"
+    - echo "Branch: $CI_COMMIT_BRANCH"
     - python3 tools/validate_bom.py --changed-files --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -59,357 +51,64 @@ validate:bom:
         - boms/functional.yaml
 
 # ============================================================
-# BASELINE DEPLOYMENT CYCLE
+# STAGE 2: GENERATE
+# Dynamically generates child pipeline based on changes
 # ============================================================
 
-# STAGE 2: REVIEW (Prod Only)
-review:prod:baseline:
-  stage: review_baseline
+generate:pipeline:
+  stage: generate
   script:
-    - echo "============================================================"
-    - echo "PRODUCTION DEPLOYMENT REVIEW (BASELINE)"
-    - echo "============================================================"
-    - echo "BOM pending deployment boms/baseline.yaml (baseline-repave)"
-    - cat boms/baseline.yaml
-    - echo "Review the BOM file in this MR to verify"
-    - echo "  - Correct target server (prod)"
-    - echo "  - Proper rollback_artifact specified"
-    - echo "  - Change request approved"
-    - echo "Click 'Approve' to proceed with baseline deployment."
-    - echo "============================================================"
-  when: manual
-  allow_failure: false
+    - echo "Generating dynamic child pipeline..."
+    - echo "Branch: $CI_COMMIT_BRANCH"
+    - python3 tools/generate_pipeline.py
+  artifacts:
+    paths:
+      - generated-pipeline.yml
+    expire_in: 1 hour
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - boms/baseline.yaml
-
-# STAGE 3: EXTRACT
-.extract_baseline_template:
-  stage: extract_baseline
-  script:
-    - echo "Extracting entities for BASELINE deployment to ${DEPLOY_ENV}..."
-    - echo "BOM boms/baseline.yaml"
-    - python3 tools/deploy.py extract --bom "boms/baseline.yaml" --skip-validation
-  artifacts:
-    paths:
-      - bundles/baseline-*.xml
-      - bundles/deployment-metadata-baseline.yaml
-    expire_in: 7 days
-
-extract:test:baseline:
-  extends: .extract_baseline_template
-  variables: { DEPLOY_ENV: "TEST" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/baseline.yaml" ]
-
-extract:staging:baseline:
-  extends: .extract_baseline_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  rules:
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/baseline.yaml" ]
-
-extract:prod:baseline:
-  extends: .extract_baseline_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "review:prod:baseline" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/baseline.yaml" ]
-
-# STAGE 4: IMPORT
-.import_baseline_template:
-  stage: import_baseline
-  script:
-    - echo "Importing BASELINE bundles to ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-baseline.yaml
-
-import:test:baseline:
-  extends: .import_baseline_template
-  variables: { DEPLOY_ENV: "TEST" }
-  dependencies: [ "extract:test:baseline" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/baseline.yaml" ]
-
-import:staging:baseline:
-  extends: .import_baseline_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  dependencies: [ "extract:staging:baseline" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/baseline.yaml" ]
-
-import:prod:baseline:
-  extends: .import_baseline_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "extract:prod:baseline" ]
-  artifacts: { expire_in: 1 year }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/baseline.yaml" ]
-
-# STAGE 5: ARCHIVE
-.archive_baseline_template:
-  stage: archive_baseline
-  script:
-    - echo "Archiving BASELINE deployment for ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-baseline.yaml
-  artifacts:
-    paths:
-      - archives/baseline-*.zip
-      - evidence/baseline-*.zip
-      - ROLLBACK_MANIFEST_BASELINE.yaml
-
-archive:test:baseline:
-  extends: .archive_baseline_template
-  variables: { DEPLOY_ENV: "TEST" }
-  dependencies: [ "import:test:baseline" ]
-  artifacts: { expire_in: 30 days }
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/baseline.yaml" ]
-
-archive:staging:baseline:
-  extends: .archive_baseline_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  dependencies: [ "import:staging:baseline" ]
-  artifacts: { expire_in: 90 days }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/baseline.yaml" ]
-
-archive:prod:baseline:
-  extends: .archive_baseline_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "import:prod:baseline" ]
-  artifacts: { expire_in: 1 year }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/baseline.yaml" ]
-
-
-# ============================================================
-# FUNCTIONAL DEPLOYMENT CYCLE
-# ============================================================
-
-# STAGE 6: REVIEW (Prod Only)
-review:prod:functional:
-  stage: review_functional
-  script:
-    - echo "============================================================"
-    - echo "PRODUCTION DEPLOYMENT REVIEW (FUNCTIONAL)"
-    - echo "============================================================"
-    - echo "BOM pending deployment boms/functional.yaml (functional-release)"
-    - cat boms/functional.yaml
-    - echo "Review the BOM file in this MR to verify"
-    - echo "  - Correct target server (prod)"
-    - echo "  - Correct entities and reference codes"
-    - echo "  - Proper rollback_artifact specified"
-    - echo "  - Change request approved"
-    - echo "Click 'Approve' to proceed with functional deployment."
-    - echo "============================================================"
-  when: manual
-  allow_failure: false
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
         - boms/functional.yaml
 
-# STAGE 7: EXTRACT
-.extract_functional_template:
-  stage: extract_functional
-  script:
-    - echo "Extracting entities for FUNCTIONAL deployment to ${DEPLOY_ENV}..."
-    - echo "BOM boms/functional.yaml"
-    - python3 tools/deploy.py extract --bom "boms/functional.yaml" --skip-validation
-  artifacts:
-    paths:
-      - bundles/functional-*.xml
-      - bundles/deployment-metadata-functional.yaml
-    expire_in: 7 days
-
-extract:test:functional:
-  extends: .extract_functional_template
-  variables: { DEPLOY_ENV: "TEST" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/functional.yaml" ]
-
-extract:staging:functional:
-  extends: .extract_functional_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/functional.yaml" ]
-
-extract:prod:functional:
-  extends: .extract_functional_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "review:prod:functional" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/functional.yaml" ]
-
-# STAGE 8: IMPORT
-.import_functional_template:
-  stage: import_functional
-  script:
-    - echo "Importing FUNCTIONAL bundles to ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-functional.yaml
-
-import:test:functional:
-  extends: .import_functional_template
-  variables: { DEPLOY_ENV: "TEST" }
-  dependencies: [ "extract:test:functional" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/functional.yaml" ]
-
-import:staging:functional:
-  extends: .import_functional_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  dependencies: [ "extract:staging:functional" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/functional.yaml" ]
-
-import:prod:functional:
-  extends: .import_functional_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "extract:prod:functional" ]
-  artifacts: { expire_in: 1 year }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/functional.yaml" ]
-
-# STAGE 9: ARCHIVE
-.archive_functional_template:
-  stage: archive_functional
-  script:
-    - echo "Archiving FUNCTIONAL deployment for ${DEPLOY_ENV} environment..."
-    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-functional.yaml
-  artifacts:
-    paths:
-      - archives/functional-*.zip
-      - evidence/functional-*.zip
-      - ROLLBACK_MANIFEST_FUNCTIONAL.yaml
-
-archive:test:functional:
-  extends: .archive_functional_template
-  variables: { DEPLOY_ENV: "TEST" }
-  dependencies: [ "import:test:functional" ]
-  artifacts: { expire_in: 30 days }
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/functional.yaml" ]
-
-archive:staging:functional:
-  extends: .archive_functional_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  dependencies: [ "import:staging:functional" ]
-  artifacts: { expire_in: 90 days }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/functional.yaml" ]
-
-archive:prod:functional:
-  extends: .archive_functional_template
-  variables: { DEPLOY_ENV: "PROD" }
-  dependencies: [ "import:prod:functional" ]
-  artifacts: { expire_in: 1 year }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/functional.yaml" ]
-
-
 # ============================================================
-# ROLLBACK JOBS
+# STAGE 3: DEPLOY
+# Triggers the dynamically generated child pipeline
 # ============================================================
 
-.rollback_baseline_template:
-  stage: .post
-  needs:
-    - job: extract:test:baseline
-      artifacts: true
-      optional: true
-    - job: extract:staging:baseline
-      artifacts: true
-      optional: true
-    - job: extract:prod:baseline
-      artifacts: true
-      optional: true
-  when: manual
-  script:
-    - echo "Rolling back BASELINE deployment for ${DEPLOY_ENV}..."
-    - echo "Rollback BOM boms/baseline.yaml"
-    - python3 tools/deploy.py rollback --bom "boms/baseline.yaml"
-
-.rollback_functional_template:
-  stage: .post
-  needs:
-    - job: extract:test:functional
-      artifacts: true
-      optional: true
-    - job: extract:staging:functional
-      artifacts: true
-      optional: true
-    - job: extract:prod:functional
-      artifacts: true
-      optional: true
-  when: manual
-  script:
-    - echo "Rolling back FUNCTIONAL deployment for ${DEPLOY_ENV}..."
-    - echo "Rollback BOM boms/functional.yaml"
-    - python3 tools/deploy.py rollback --bom "boms/functional.yaml"
-
-# Rollback job definitions
-rollback:test:baseline:
-  extends: .rollback_baseline_template
-  variables: { DEPLOY_ENV: "TEST" }
+trigger:deploy:
+  stage: deploy
+  trigger:
+    include:
+      - artifact: generated-pipeline.yml
+        job: generate:pipeline
+    strategy: depend  # Wait for child pipeline to complete
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/baseline.yaml" ]
-      when: manual
-
-rollback:staging:baseline:
-  extends: .rollback_baseline_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/baseline.yaml" ]
-      when: manual
-
-rollback:prod:baseline:
-  extends: .rollback_baseline_template
-  variables: { DEPLOY_ENV: "PROD" }
-  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/baseline.yaml" ]
-      when: manual
-
-rollback:test:functional:
-  extends: .rollback_functional_template
-  variables: { DEPLOY_ENV: "TEST" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes: [ "boms/functional.yaml" ]
-      when: manual
-
-rollback:staging:functional:
-  extends: .rollback_functional_template
-  variables: { DEPLOY_ENV: "STAGING" }
-  rules:
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes: [ "boms/functional.yaml" ]
-      when: manual
-
-rollback:prod:functional:
-  extends: .rollback_functional_template
-  variables: { DEPLOY_ENV: "PROD" }
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes: [ "boms/functional.yaml" ]
-      when: manual
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
+        - boms/functional.yaml

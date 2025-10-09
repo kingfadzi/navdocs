@@ -1,0 +1,87 @@
+# Job Templates for Dynamic Pipeline
+# These templates are extended by the generated pipeline
+
+# ============================================================
+# BASELINE TEMPLATES
+# ============================================================
+
+.review_baseline_template:
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION DEPLOYMENT REVIEW (BASELINE)"
+    - echo "============================================================"
+    - echo "BOM pending deployment boms/baseline.yaml (baseline-repave)"
+    - cat boms/baseline.yaml
+    - echo ""
+    - echo "Review the BOM file in this MR to verify:"
+    - echo "  - Correct target server (prod)"
+    - echo "  - Proper rollback_pipeline_id specified"
+    - echo "  - Change request approved"
+    - echo ""
+    - echo "Click 'Approve' to proceed with baseline deployment."
+    - echo "============================================================"
+
+.extract_baseline_template:
+  script:
+    - echo "Extracting entities for BASELINE deployment to ${DEPLOY_ENV}..."
+    - echo "BOM boms/baseline.yaml"
+    - python3 tools/deploy.py extract --bom "boms/baseline.yaml" --skip-validation
+
+.import_baseline_template:
+  script:
+    - echo "Importing BASELINE bundles to ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-baseline.yaml
+
+.archive_baseline_template:
+  script:
+    - echo "Archiving BASELINE deployment for ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-baseline.yaml
+
+.rollback_baseline_template:
+  script:
+    - echo "Rolling back BASELINE deployment for ${DEPLOY_ENV}..."
+    - echo "Rollback BOM boms/baseline.yaml"
+    - python3 tools/deploy.py rollback --bom "boms/baseline.yaml"
+
+# ============================================================
+# FUNCTIONAL TEMPLATES
+# ============================================================
+
+.review_functional_template:
+  script:
+    - echo "============================================================"
+    - echo "PRODUCTION DEPLOYMENT REVIEW (FUNCTIONAL)"
+    - echo "============================================================"
+    - echo "BOM pending deployment boms/functional.yaml (functional-release)"
+    - cat boms/functional.yaml
+    - echo ""
+    - echo "Review the BOM file in this MR to verify:"
+    - echo "  - Correct target server (prod)"
+    - echo "  - Correct entities and reference codes"
+    - echo "  - Proper rollback_pipeline_id specified"
+    - echo "  - Change request approved"
+    - echo ""
+    - echo "Click 'Approve' to proceed with functional deployment."
+    - echo "============================================================"
+
+.extract_functional_template:
+  script:
+    - echo "Extracting entities for FUNCTIONAL deployment to ${DEPLOY_ENV}..."
+    - echo "BOM boms/functional.yaml"
+    - python3 tools/deploy.py extract --bom "boms/functional.yaml" --skip-validation
+
+.import_functional_template:
+  script:
+    - echo "Importing FUNCTIONAL bundles to ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py import --metadata bundles/deployment-metadata-functional.yaml
+
+.archive_functional_template:
+  script:
+    - echo "Archiving FUNCTIONAL deployment for ${DEPLOY_ENV} environment..."
+    - python3 tools/deploy.py archive --metadata bundles/deployment-metadata-functional.yaml
+
+.rollback_functional_template:
+  script:
+    - echo "Rolling back FUNCTIONAL deployment for ${DEPLOY_ENV}..."
+    - echo "Rollback BOM boms/functional.yaml"
+    - python3 tools/deploy.py rollback --bom "boms/functional.yaml"
