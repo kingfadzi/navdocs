@@ -48,12 +48,12 @@ def load_rules():
     return rules
 
 
-def check_rules(section, top_level_bom, config, rules, branch_name=None):
+def check_rules(bom, config, rules, branch_name=None):
     """Apply governance rules. Returns list of errors."""
     errors = []
 
-    source = top_level_bom.get('source_server', '')
-    target = top_level_bom.get('target_server', '')
+    source = bom.get('source_server', '')
+    target = bom.get('target_server', '')
 
     # Get env types from servers
     servers = config.get('servers', {})
@@ -78,15 +78,14 @@ def check_rules(section, top_level_bom, config, rules, branch_name=None):
     rule = rules.get('require_prod_rollback', {})
     if rule.get('enabled'):
         applies_to = rule.get('applies_to', ['prod'])
-        if target_env in applies_to and 'rollback_pipeline_id' not in section:
-            section_name = section.get('profile', 'section')
-            errors.append(f"[{section_name}] {rule.get('message', 'Rollback pipeline ID required')}")
+        if target_env in applies_to and 'rollback_pipeline_id' not in bom:
+            errors.append(rule.get('message', 'Rollback pipeline ID required'))
 
     # RULE 3: Prod needs change request
     rule = rules.get('require_prod_change_request', {})
     if rule.get('enabled'):
         applies_to = rule.get('applies_to', ['prod'])
-        if target_env in applies_to and 'change_request' not in top_level_bom:
+        if target_env in applies_to and 'change_request' not in bom:
             errors.append(rule.get('message', 'Change request required'))
 
     # RULE 4: Source != target
@@ -118,52 +117,9 @@ def check_rules(section, top_level_bom, config, rules, branch_name=None):
     return errors
 
 
-def validate_bom_section(bom_section, section_name, top_level_bom, config, rules, branch_name):
-    """
-    Validate a single section (baseline or functional) of the BOM.
-    Returns a list of errors.
-    """
-    errors = []
-    is_rollback = 'rollback_pipeline_id' in bom_section
-
-    # Common required fields
-    if 'profile' not in bom_section:
-        errors.append(f"[{section_name}] Missing required field: profile")
-
-    # Check profile exists
-    if 'profile' in bom_section:
-        root = Path(__file__).parent.parent
-        profile_path = root / 'profiles' / f"{bom_section['profile']}.yaml"
-        if not profile_path.exists():
-            errors.append(f"[{section_name}] Profile not found: {bom_section['profile']} (expected: {profile_path})")
-
-    # Section-specific validation
-    if section_name == 'baseline':
-        if 'description' not in bom_section:
-            errors.append(f"[{section_name}] Missing required field: description")
-    elif section_name == 'functional':
-        if not is_rollback and 'entities' not in bom_section:
-            errors.append(f"[{section_name}] Missing required field: entities")
-        if 'entities' in bom_section:
-            if not isinstance(bom_section['entities'], list) or len(bom_section['entities']) == 0:
-                errors.append(f"[{section_name}] Entities must be a non-empty list")
-            else:
-                for i, entity in enumerate(bom_section['entities']):
-                    if 'entity_id' not in entity:
-                        errors.append(f"[{section_name}] Entity {i}: missing entity_id")
-                    if 'reference_code' not in entity:
-                        errors.append(f"[{section_name}] Entity {i}: missing reference_code")
-
-    # Apply governance rules
-    if config and rules:
-        errors.extend(check_rules(bom_section, top_level_bom, config, rules, branch_name))
-
-    return errors
-
-
 def validate_bom(bom_file, branch_name=None):
     """
-    Validate the consolidated boms/deployment.yaml file.
+    Validate a single BOM file (baseline.yaml or functional.yaml).
     """
     errors = []
     bom_path = Path(bom_file)
@@ -171,36 +127,53 @@ def validate_bom(bom_file, branch_name=None):
     if not bom_path.exists():
         return False, [f"File not found: {bom_file}"]
 
-    bom_content, err = load_yaml(bom_path)
+    bom, err = load_yaml(bom_path)
     if err:
         return False, [f"YAML syntax error: {err}"]
 
-    if not bom_content:
+    if not bom:
         return False, ["BOM file is empty"]
 
-    # General required fields
-    top_level_required = ['version', 'created_by', 'source_server', 'target_server']
-    for field in top_level_required:
-        if field not in bom_content:
-            errors.append(f"Missing required top-level field: {field}")
+    # Required fields for all BOMs
+    required_fields = ['version', 'profile', 'source_server', 'target_server', 'created_by']
+    for field in required_fields:
+        if field not in bom:
+            errors.append(f"Missing required field: {field}")
 
-    # Check which sections are present and enabled
-    baseline_section = bom_content.get('baseline')
-    functional_section = bom_content.get('functional')
-    is_baseline_enabled = isinstance(baseline_section, dict) and baseline_section.get('enabled', False)
-    is_functional_enabled = isinstance(functional_section, dict) and functional_section.get('enabled', False)
+    # Check if profile file exists
+    if 'profile' in bom:
+        root = Path(__file__).parent.parent
+        profile_path = root / 'profiles' / f"{bom['profile']}.yaml"
+        if not profile_path.exists():
+            errors.append(f"Profile not found: {bom['profile']} (expected: {profile_path})")
 
-    if not is_baseline_enabled and not is_functional_enabled:
-        errors.append("BOM must contain at least one enabled 'baseline' or 'functional' section.")
+    # Determine BOM type from profile and validate accordingly
+    profile = bom.get('profile', '')
+    is_rollback = 'rollback_pipeline_id' in bom
 
+    if 'baseline' in profile.lower():
+        # Baseline-specific validation
+        if 'description' not in bom:
+            errors.append("Baseline BOMs require 'description' field")
+    elif 'functional' in profile.lower():
+        # Functional-specific validation
+        if not is_rollback and 'entities' not in bom:
+            errors.append("Functional BOMs require 'entities' field (unless rollback)")
+        if 'entities' in bom:
+            if not isinstance(bom['entities'], list) or len(bom['entities']) == 0:
+                errors.append("Entities must be a non-empty list")
+            else:
+                for i, entity in enumerate(bom['entities']):
+                    if 'entity_id' not in entity:
+                        errors.append(f"Entity {i}: missing entity_id")
+                    if 'reference_code' not in entity:
+                        errors.append(f"Entity {i}: missing reference_code")
+
+    # Apply governance rules
     config = load_config()
     rules = load_rules()
-
-    if is_baseline_enabled:
-        errors.extend(validate_bom_section(baseline_section, 'baseline', bom_content, config, rules, branch_name))
-
-    if is_functional_enabled:
-        errors.extend(validate_bom_section(functional_section, 'functional', bom_content, config, rules, branch_name))
+    if config and rules:
+        errors.extend(check_rules(bom, config, rules, branch_name))
 
     return len(errors) == 0, errors
 

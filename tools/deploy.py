@@ -108,7 +108,7 @@ def create_evidence_package(bom_file, archive_path, config):
     evidence_dir.mkdir(exist_ok=True)
     bom = load_yaml(bom_file)
     change_request = bom.get('change_request', 'baseline')
-    target_server = bom.get('baseline', {}).get('target_server') or bom.get('functional', {}).get('target_server', 'unknown')
+    target_server = bom.get('target_server', 'unknown')
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     evidence_name = f"{change_request}-{target_server}-{timestamp}-evidence.zip"
     evidence_path = evidence_dir / evidence_name
@@ -176,32 +176,16 @@ def print_gitlab_artifact_info(archive_path, bom_file, metadata):
     print("=" * 60)
 
 
-def get_bom_section(bom_file, deployment_type):
-    """Load the full BOM and return the specific section if it's enabled."""
-    full_bom = load_yaml(bom_file)
-    section = full_bom.get(deployment_type)
-
-    if not isinstance(section, dict):
-        print(f"Error: Deployment type '{deployment_type}' not found or is not a valid section in {bom_file}")
-        sys.exit(1)
-
-    if not section.get('enabled', False):
-        print(f"Skipping: Deployment type '{deployment_type}' is not enabled in {bom_file} (`enabled: false`).")
-        sys.exit(0) # Exit gracefully, not an error
-
-    return section, full_bom
-
-
 def extract_command(bom_file, deployment_type):
     """PHASE 1: Extract entities and save metadata."""
     print("=" * 60)
     print(f"PHASE 1: EXTRACT ({deployment_type.upper()})")
     print("=" * 60)
     root = Path(__file__).parent.parent
-    bom, full_bom = get_bom_section(bom_file, deployment_type)
+    bom = load_yaml(bom_file)
     profile_name = bom['profile']
-    source_server = full_bom['source_server']
-    target_server = full_bom['target_server']
+    source_server = bom['source_server']
+    target_server = bom['target_server']
     print(f"Source: {source_server}, Target: {target_server}, Profile: {profile_name}\n")
     is_baseline = 'baseline' in profile_name.lower()
     config = load_yaml(root / "config" / "deployment-config.yaml")
@@ -223,8 +207,8 @@ def extract_command(bom_file, deployment_type):
         'deployment_type': deployment_type, 'profile': profile_name,
         'source_server': source_server, 'target_server': target_server,
         'flags': flags, 'bundles': bundles, 'bom_file': str(bom_file),
-        'bom_version': full_bom.get('version', 'unknown'),
-        'change_request': full_bom.get('change_request', 'N/A'),
+        'bom_version': bom.get('version', 'unknown'),
+        'change_request': bom.get('change_request', 'N/A'),
         'extracted_at': datetime.now().isoformat(),
         'i18n_mode': 'none' if is_baseline else 'charset', 'refdata_mode': 'nochange'
     }
@@ -353,18 +337,20 @@ def main():
         epilog="""
 Examples:
   # Full deployment command (for local testing)
-  deploy.py deploy --type baseline --bom boms/deployment.yaml
+  deploy.py deploy --type baseline --bom boms/baseline.yaml
+  deploy.py deploy --type functional --bom boms/functional.yaml
 
   # CI/CD pipeline stage commands
-  deploy.py extract --type baseline --bom boms/deployment.yaml
-  deploy.py import --type baseline --bom boms/deployment.yaml
-  deploy.py archive --type baseline --bom boms/deployment.yaml
+  deploy.py extract --type baseline --bom boms/baseline.yaml
+  deploy.py import --type baseline --bom boms/baseline.yaml
+  deploy.py archive --type baseline --bom boms/baseline.yaml
+
   # Manual rollback command
-  deploy.py rollback --type functional --bom boms/deployment.yaml
+  deploy.py rollback --type functional --bom boms/functional.yaml
         """
     )
     parser.add_argument('command', choices=['extract', 'import', 'archive', 'rollback', 'deploy'], help='Deployment command')
-    parser.add_argument('--bom', required=True, help='BOM file path (boms/deployment.yaml)')
+    parser.add_argument('--bom', required=True, help='BOM file path (e.g., boms/baseline.yaml or boms/functional.yaml)')
     parser.add_argument('--type', choices=['baseline', 'functional'], help="Deployment type")
     args = parser.parse_args()
 

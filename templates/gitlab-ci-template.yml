@@ -8,14 +8,15 @@ stages:
   - archive
 
 variables:
-  # DEPLOYMENT_TYPE is expected to be passed in from the parent pipeline (e.g., 'baseline' or 'functional')
+  # DEPLOYMENT_TYPE and BOM_FILE are passed in from the parent pipeline
   DEPLOYMENT_TYPE: "not-set"
+  BOM_FILE: "not-set"
 
 extract:
   stage: extract
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
-    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
       - bundles/
@@ -25,14 +26,14 @@ import:
   stage: import
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
-    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract]
 
 archive:
   stage: archive
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
-    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [import]
   artifacts:
     paths:

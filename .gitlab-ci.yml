@@ -1,9 +1,8 @@
 # Main PPM Deployment Pipeline
-# This pipeline validates the consolidated BOM and then triggers reusable workflows.
+# This pipeline validates baseline and functional BOMs and triggers deployments based on file changes.
 
 stages:
   - validate
-  - prepare
   - deploy
 
 # Default configuration
@@ -21,70 +20,69 @@ default:
 # STAGE 1: VALIDATE
 # ============================================================
 
-validate:
+validate_baseline:
   stage: validate
   script:
-    - echo "Validating consolidated BOM file..."
-    - python3 tools/validate_bom.py --file boms/deployment.yaml --branch "$CI_COMMIT_BRANCH"
+    - echo "Validating baseline BOM..."
+    - python3 tools/validate_bom.py --file boms/baseline.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/deployment.yaml
+        - boms/baseline.yaml
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
-        - boms/deployment.yaml
+        - boms/baseline.yaml
 
-# ============================================================
-# STAGE 2: PREPARE
-# ============================================================
-
-decide:
-  stage: prepare
+validate_functional:
+  stage: validate
   script:
-    - echo "Deciding which deployments to run using Python..."
-    - |
-      BASELINE_ENABLED=$(python3 -c "import yaml; print(str(yaml.safe_load(open('boms/deployment.yaml')).get('baseline', {}).get('enabled', False)).lower())")
-      echo "BASELINE_ENABLED=${BASELINE_ENABLED}" >> build.env
-    - |
-      FUNCTIONAL_ENABLED=$(python3 -c "import yaml; print(str(yaml.safe_load(open('boms/deployment.yaml')).get('functional', {}).get('enabled', False)).lower())")
-      echo "FUNCTIONAL_ENABLED=${FUNCTIONAL_ENABLED}" >> build.env
-    - echo "Decision variables:"
-    - cat build.env
-  artifacts:
-    reports:
-      dotenv: build.env
+    - echo "Validating functional BOM..."
+    - python3 tools/validate_bom.py --file boms/functional.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/deployment.yaml
+        - boms/functional.yaml
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
-        - boms/deployment.yaml
+        - boms/functional.yaml
 
 # ============================================================
-# STAGE 3: DEPLOY
+# STAGE 2: DEPLOY
 # ============================================================
 
 deploy_baseline:
   stage: deploy
-  needs: [decide]
   trigger:
     include:
       - local: templates/gitlab-ci-template.yml
     strategy: depend
   variables:
     DEPLOYMENT_TYPE: baseline
+    BOM_FILE: boms/baseline.yaml
   rules:
-    - if: '$BASELINE_ENABLED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/baseline.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
 
 deploy_functional:
   stage: deploy
-  needs: [decide, deploy_baseline] # Ensures baseline runs first if present
+  needs:
+    - job: deploy_baseline
+      optional: true  # Only wait if baseline job exists
   trigger:
     include:
       - local: templates/gitlab-ci-template.yml
     strategy: depend
   variables:
     DEPLOYMENT_TYPE: functional
+    BOM_FILE: boms/functional.yaml
   rules:
-    - if: '$FUNCTIONAL_ENABLED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/functional.yaml
