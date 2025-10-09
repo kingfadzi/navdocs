@@ -30,7 +30,7 @@ validate:bom:
   stage: validate
   script:
     - echo "Validating BOM files..."
-    - echo "Branch: $CI_COMMIT_BRANCH"
+    - echo "Branch - $CI_COMMIT_BRANCH"
     - python3 tools/validate_bom.py --changed-files --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -59,7 +59,7 @@ generate:pipeline:
   stage: generate
   script:
     - echo "Generating dynamic child pipeline..."
-    - echo "Branch: $CI_COMMIT_BRANCH"
+    - echo "Branch - $CI_COMMIT_BRANCH"
     - python3 tools/generate_pipeline.py
   artifacts:
     paths:
