@@ -1,0 +1,41 @@
+# .gitlab-ci-template.yml
+# This is a reusable workflow for a single deployment type (e.g., baseline or functional).
+# It is triggered by the main .gitlab-ci.yml file.
+
+stages:
+  - extract
+  - import
+  - archive
+
+variables:
+  # DEPLOYMENT_TYPE is expected to be passed in from the parent pipeline (e.g., 'baseline' or 'functional')
+  DEPLOYMENT_TYPE: "not-set"
+
+extract:
+  stage: extract
+  script:
+    - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
+    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+  artifacts:
+    paths:
+      - bundles/
+    expire_in: 1 hour
+
+import:
+  stage: import
+  script:
+    - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
+    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+  needs: [extract]
+
+archive:
+  stage: archive
+  script:
+    - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
+    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom boms/deployment.yaml
+  needs: [import]
+  artifacts:
+    paths:
+      - archives/
+      - evidence/
+    expire_in: 1 year

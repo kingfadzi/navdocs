@@ -1,114 +1,64 @@
-# PPM Deployment Pipeline - Dynamic Child Pipeline Architecture
-# Generates child pipeline based on which BOMs changed and target environment
+# Main PPM Deployment Pipeline
+# This pipeline validates the consolidated BOM and then triggers reusable workflows.
 
 stages:
   - validate
-  - generate
   - deploy
 
 # Default configuration
 default:
   image: almalinux:8
   before_script:
-    # Install Python 3.11 on AlmaLinux 8
+    # Install Python 3.11 and yq on AlmaLinux 8
     - dnf install -y -q git bash
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
     - pip3.11 install PyYAML --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
-
-# Variables
-variables:
-  BOM_DIR: "boms"
+    - dnf install -y https://github.com/mikefarah/yq/releases/download/v4.27.5/yq_linux_amd64.rpm
 
 # ============================================================
 # STAGE 1: VALIDATE
-# Validates BOM schema and required fields
+# Validates the consolidated boms/deployment.yaml
 # ============================================================
 
-validate:bom:
+validate:
   stage: validate
   script:
-    - echo "Validating BOM files..."
-    - echo "Branch - $CI_COMMIT_BRANCH"
-    - python3 tools/validate_bom.py --changed-files --branch "$CI_COMMIT_BRANCH"
+    - echo "Validating consolidated BOM file..."
+    - python3 tools/validate_bom.py --file boms/deployment.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "main"'
+        - boms/deployment.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
+        - boms/deployment.yaml
 
 # ============================================================
-# STAGE 2: GENERATE
-# Dynamically generates child pipeline based on changes
+# STAGE 2: DEPLOY
+# Triggers the reusable child pipeline for baseline and/or functional deployments.
 # ============================================================
 
-generate:pipeline:
-  stage: generate
-  script:
-    - echo "Generating dynamic child pipeline..."
-    - echo "Branch - $CI_COMMIT_BRANCH"
-    - python3 tools/generate_pipeline.py
-  artifacts:
-    paths:
-      - generated-pipeline.yml
-    expire_in: 1 hour
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
+      # This script checks if the 'baseline' section exists and its 'enabled' flag is true.
+      script: 'yq e ".baseline.enabled == true" boms/deployment.yaml | grep -q true'
 
-# ============================================================
-# STAGE 3: DEPLOY
-# Triggers the dynamically generated child pipeline
-# ============================================================
-
-trigger:deploy:
+deploy_functional:
   stage: deploy
+  needs: [deploy_baseline] # Ensures baseline runs first if present
   trigger:
     include:
-      - artifact: generated-pipeline.yml
-        job: generate:pipeline
-    strategy: depend  # Wait for child pipeline to complete
+      - local: templates/gitlab-ci-template.yml
+    strategy: depend
+  variables:
+    DEPLOYMENT_TYPE: functional
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "merge_request_event")'
       changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH =~ /^feature\//'
-      changes:
-        - boms/baseline.yaml
-        - boms/functional.yaml
+        - boms/deployment.yaml
+      # This script checks if the 'functional' section exists and its 'enabled' flag is true.
+      exists:
+        - boms/deployment.yaml
+      when: on_success
+      allow_failure: false
+      script: 'yq e ".functional.enabled == true" boms/deployment.yaml | grep -q true'

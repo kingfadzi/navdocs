@@ -2,281 +2,89 @@
 
 ## Overview
 
-Declarative, opinionated deployment system for OpenText PPM entity migration with:
-- **BOM-driven deployments** - All deployments defined in version-controlled YAML files
-- **Baseline-first approach** - Stable foundation before continuous deployment
-- **GitLab CI/CD pipeline** - Automated deployments with approval gates
-- **Manifest-based rollback** - Every deployment archived with manifest for instant rollback
-- **Mock-first testing** - Test locally without real PPM server
+This is a declarative, opinionated deployment system for OpenText PPM entity migration. It is built on a few core principles:
+- **Single BOM-driven deployments** - All deployments are defined in a single, version-controlled YAML file (`boms/deployment.yaml`).
+- **Baseline-first execution** - The pipeline guarantees that foundational 'baseline' entities are deployed before 'functional' business logic.
+- **Static, Reusable GitLab CI/CD** - A simple, clear pipeline orchestrates deployments by triggering a reusable, staged workflow.
+- **Manual, Manifest-based Rollback** - Every deployment is archived, but rollbacks are a deliberate, manual action performed via the CLI.
+- **Mock-first Testing** - The system can be tested locally without a real PPM server.
 
 ---
 
 ## Core Components
 
-### 1. **Bill of Materials (BOM)**
-YAML manifest that defines:
-- What entities to deploy (reference codes)
-- Source and target environments
-- Version number (semantic versioning)
-- Change request number (for functional)
-- Rollback artifact (for prod)
+### 1. **The Unified Bill of Materials (BOM)**
+A single YAML manifest (`boms/deployment.yaml`) that defines an entire deployment event.
+- **Shared Configuration:** Defines the `source_server` and `target_server` at the top level.
+- **Deployment Sections:** Contains optional `baseline` and `functional` sections.
+- **Control Flags:** Each section has an `enabled` flag to control whether it runs.
+- **Rollback Path:** Each section can specify a `rollback_pipeline_id` for production environments.
 
-**Example:**
+**Example (`boms/deployment.yaml`):**
 ```yaml
-version: "1.0.0"
+version: "3.0.0"
 change_request: "CR-12345"
-profile: functional-cd
-source_environment: dev
-target_environment: test
-entities:
-  - entity_id: 9
-    reference_code: "WF_INCIDENT_MGMT"
-# rollback_pipeline_id: 12300  # Pipeline ID from previous successful deployment
+created_by: "dev-team"
+
+# Shared server configuration
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
+
+# Baseline section (optional)
+baseline:
+  enabled: true
+  profile: baseline
+  description: "Initial entity sync."
+  rollback_pipeline_id: 12344
+
+# Functional section (optional)
+functional:
+  enabled: true
+  profile: functional-cd
+  description: "Deploy new incident workflow."
+  rollback_pipeline_id: 12345
+  entities:
+    - entity_id: 9
+      reference_code: "WF_INCIDENT_MGMT"
 ```
 
 ### 2. **Profiles**
-Define deployment behavior via structured flags:
-- **baseline.yaml** - Replace existing = Y, Add missing = Y (for infrastructure)
-- **functional-cd.yaml** - Replace existing = Y, Add missing = N (for business logic)
-
-Profiles compile to 25-character Y/N flag string automatically.
+Define deployment behavior via structured flags (`profiles/*.yaml`):
+- **`baseline.yaml`** - Broadly syncs foundational entities (Add Missing = Y).
+- **`functional-cd.yaml`** - Deploys specific business logic on an existing baseline (Add Missing = N).
 
 ### 3. **Deployment Script (`deploy.py`)**
-Single orchestrator that:
-1. Extracts entities from source
-2. Imports to target with compiled flags
-3. Archives deployment with rollback manifest
-4. Cleans up temporary files
-
-Used for both local testing and CI/CD.
+The single orchestrator for all actions, used by both the pipeline and users.
+- **Staged Commands:** `extract`, `import`, `archive` for the CI/CD pipeline.
+- **One-Shot Command:** `deploy` for convenient local end-to-end execution.
+- **Rollback Command:** `rollback` for manual rollback operations.
 
 ### 4. **GitLab Pipeline**
-Five granular stages:
-- **Validate** - BOM schema checks
-- **Review** - Manual approval (prod only)
-- **Extract** - Extract entities from source
-- **Import** - Import bundles to target
-- **Archive** - Create archive and evidence
-
-### 5. **Rollback System**
-Manifest-based rollback using GitLab artifacts:
-- Stores deployment archives (bundles + BOM + flags + manifest)
-- Enables rollback without re-extracting
-- Uses pipeline ID to reference previous deployments
+A simple, two-stage pipeline defined in `.gitlab-ci.yml`:
+- **`validate`:** Validates the `boms/deployment.yaml` file against all governance rules.
+- **`deploy`:** Triggers a reusable child pipeline (`templates/gitlab-ci-template.yml`) for the `baseline` and/or `functional` sections if they are enabled. The `needs` keyword ensures the baseline deployment always runs first.
 
 ---
 
-## Entity Categories
+## Deployment & Rollback Strategy
 
-### **Baseline Entities** (Infrastructure)
-Must be aligned across ALL environments before continuous deployment.
+### **Deployment Workflow**
+The promotion process is now managed by editing the single BOM file.
+1.  **Create Feature Branch:** Create a new branch for your change.
+2.  **Edit `boms/deployment.yaml`:**
+    *   Set the `source_server` and `target_server`.
+    *   Ensure the desired section (`baseline` or `functional`) has `enabled: true`.
+    *   Add entities to the `functional` section if needed.
+3.  **Commit & Create Merge Request:** The pipeline runs automatically. It validates the BOM and then runs the enabled deployments in the correct order.
+4.  **Promote:** To promote to the next environment (e.g., from `test` to `staging`), you merge, pull, and simply update the `target_server` in `boms/deployment.yaml` on the promotion branch.
 
-| Entity | Entity ID | Risk | Change Frequency |
-|--------|-----------|------|------------------|
-| Object Types | 26 | HIGH | Quarterly |
-| Request Header Types | 39 | HIGH | Quarterly |
-| Validations | 13 | MEDIUM | Monthly |
-| User Data Contexts | 37 | MEDIUM | Quarterly |
-| Special Commands | 11 | MEDIUM | As-needed |
-| Environments | 4 | LOW | Rarely |
-| Environment Groups | 58 | LOW | Rarely |
-
-**Philosophy:** Drift is corrected proactively (Add Missing = Y)
-
-### **Functional Entities** (Business Logic)
-Deploy frequently once baseline is stable.
-
-| Entity | Entity ID | Risk | Change Frequency |
-|--------|-----------|------|------------------|
-| Workflows | 9 | MEDIUM | Weekly |
-| Request Types | 19 | MEDIUM | Weekly |
-| Report Types | 17 | LOW | Weekly |
-| Portlet Definitions | 509 | LOW | Weekly |
-| Dashboard Modules | 470 | LOW | Weekly |
-| Work Plan Templates | 522 | LOW | Monthly |
-| Project Types | 521 | MEDIUM | Monthly |
-
-**Philosophy:** Drift is tolerated (Add Missing = N, baseline handles dependencies)
-
----
-
-## Deployment Strategy
-
-### **Baseline Repave**
-Deploy ALL baseline entity types (full sync).
-
-* **When:** Initial setup, quarterly alignment, or on-demand
-* **Scope:** All 7 baseline entity types
-* **Flags:** Replace = Y, Add Missing = Y
-* **Risk:** HIGH - affects all downstream entities
-* **Approval:** 2 (non-prod), 3+ (prod) with platform team
-
-**BOM Example:**
-```yaml
-version: "1.0.0"
-profile: baseline
-source_environment: prod
-target_environment: test
-description: "Q4 2025 baseline alignment"
-created_by: "ops-team"
-```
-
-### **Functional Release**
-Deploy SPECIFIC functional entities (selective).
-
-* **When:** Sprint releases, feature deployments
-* **Scope:** Only entities in BOM
-* **Flags:** Replace = Y, Add Missing = N
-* **Risk:** MEDIUM - isolated to specific entities
-* **Approval:** 2 (non-prod), 3+ (prod)
-
-**BOM Example:**
-```yaml
-version: "2.0.0"
-change_request: "CR-54321"
-profile: functional-cd
-source_environment: dev
-target_environment: test
-entities:
-  - entity_id: 9
-    reference_code: "WF_INCIDENT_MGMT"
-    entity_type: "Workflow"
-# rollback_pipeline_id: 12345  # Pipeline ID from previous successful deployment
-```
-
----
-
-## Branching & Promotion Flow
-
-### **Branch Strategy**
-
-| Branch | Deploys To | MR Approvals | Pipeline Gate |
-|--------|------------|--------------|---------------|
-| `feature/*` | Dev | 2 | None |
-| `develop` | Test | 2 | None |
-| `main` | Prod | 3+ | Manual review |
-
-### **Promotion Workflow**
-
-```
-1. Feature branch → boms/functional/dev/CR-12345-v1.0.0.yaml
-   └─> MR (2 approvals) → Merge → Auto-deploy to dev
-
-2. Copy to test → boms/functional/test/CR-12345-v1.0.0.yaml
-   └─> MR to develop (2 approvals) → Merge → Auto-deploy to test
-
-3. Copy to prod → boms/functional/prod/CR-12345-v1.0.0.yaml
-   └─> Add rollback_pipeline_id
-   └─> MR to main (3+ approvals) → Manual review → Deploy to prod
-```
-
-Each environment gets its own BOM for clear audit trail.
-
----
-
-## Rollback Strategy
-
-### **Archive on Success**
-Every successful deployment creates:
-```
-CR-12345-v1.0.0-20251007-bundles.zip
-├── bundles/              # Extracted XML files
-├── bom.yaml              # Original BOM
-├── flags.txt             # Exact flags used
-└── manifest.yaml         # Metadata (version, timestamp, checksums)
-
-ROLLBACK_MANIFEST.yaml    # Points to exact archive bundle (GitLab artifact)
-```
-
-Stored as GitLab pipeline artifact with manifest for deterministic rollback.
-
-### **Rollback Execution**
-
-1. Add `rollback_pipeline_id` to BOM pointing to previous GitLab pipeline
-2. Get same approvals as forward deployment
-3. Pipeline downloads artifacts using manifest and redeploys using **original flags**
-
-**Key:** Rollback uses exact flags from original deployment for consistency.
-
----
-
-## Governance & Approvals
-
-### **Approval Matrix**
-
-| Deployment | Environment | MR Approvals | Pipeline Gate | Total |
-|------------|-------------|--------------|---------------|-------|
-| Functional | Dev | 2 | None | 2 |
-| Functional | Test | 2 | None | 2 |
-| Functional | Prod | 3+ | Manual | 4+ |
-| Baseline | Dev | 2 | None | 2 |
-| Baseline | Test | 2 (+ platform) | None | 2 |
-| Baseline | Prod | 3+ (+ platform) | Manual | 4+ |
-
-### **CODEOWNERS**
-- Baseline BOMs → `@platform-team` required
-- Prod BOMs → `@tech-leads` + `@ops-team` required
-- Profiles/schemas → `@platform-team` required
-
----
-
-## Key Design Principles
-
-* **Opinionated** - Two deployment types (baseline/functional), no overrides
-* **Declarative** - BOMs are version-controlled, reviewed via MR
-* **Idempotent** - Same BOM = same result (safe to rerun)
-* **Testable** - Mock scripts work without real PPM
-* **Lean** - Reuses `deploy.py` for local and CI/CD
-* **Traceable** - Git commits + GitLab artifacts = full audit trail
-
----
-
-## Benefits
-
-### **For Platform Engineers:**
-- No manual flag strings (compiled from profiles)
-- No manual kMigrator commands (automated by deploy.py)
-- Instant rollback (download from GitLab artifacts, redeploy)
-
-### **For Operations:**
-- Clear approval gates (2 or 3+ depending on environment)
-- BOM review before deployment (see exactly what will change)
-- Audit trail (Git history + GitLab artifacts)
-
-### **For Developers:**
-- Test locally with mock scripts (no PPM needed)
-- Same tooling for dev/test/prod (consistency)
-- Fast feedback (automated deployments)
-
----
-
-## Common Scenarios
-
-### **Initial Setup (New Environment)**
-1. Run baseline repave to establish foundation
-2. Test functional deployment with sample workflow
-3. Enable continuous deployment
-
-### **Sprint Release (Functional Changes)**
-1. Create BOM in feature branch
-2. Test in dev → promote to test → promote to prod
-3. Each step requires MR approval
-
-### **Quarterly Baseline Sync**
-1. Platform team creates baseline BOM
-2. Test in dev/test first
-3. Schedule prod deployment (off-hours)
-4. Requires 3+ approvals including platform team
-
-### **Emergency Rollback**
-1. Add `rollback_pipeline_id` to BOM pointing to previous GitLab pipeline
-2. Get expedited approvals (same as forward: 3+ for prod)
-3. Deploy (fast: no extraction needed)
-
----
-
-## References
-
-- [OpenText PPM kMigrator Documentation](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122150_InstallAdmin_Server.htm)
-- [Semantic Versioning](https://semver.org/)
-- [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)
+### **Rollback Strategy (Manual)**
+Rollback is a deliberate CLI action, not part of the automated pipeline.
+1.  **Configure `deployment.yaml`:** In the section you want to roll back, set `rollback_pipeline_id` to either:
+    *   A **numeric ID** from a previous GitLab pipeline.
+    *   The keyword **`local`** to use the artifacts from your last local `deploy` run.
+2.  **Run Command:** Execute the `rollback` command from your terminal, providing the necessary credentials.
+    ```bash
+    python3 tools/deploy.py rollback --type functional --bom boms/deployment.yaml
+    ```
+The script downloads the archived artifacts (bundles and original flags) and redeploys them to the target server.

@@ -13,7 +13,6 @@ deployment_promotion_order:
   enabled: true
   severity: blocking
   # Define promotion sequence - strict sequential promotion enforced (no skipping)
-  # Each deployment must go to the NEXT environment in sequence only
   # Current environments: dev -> test -> staging -> prod
   sequence: [dev, test, staging, prod]
   message: "Deployments must follow strict promotion order: dev → test → staging → prod (no skipping)"
@@ -37,12 +36,6 @@ prevent_same_server:
   enabled: true
   severity: blocking
   message: "Source and target servers must be different"
-
-# Functional BOMs must have entities
-require_entities_functional:
-  enabled: true
-  severity: blocking
-  message: "Functional deployments must specify entities[]"
 
 # Branch-environment alignment
 # Ensures BOM target_server matches the branch deployment environment
