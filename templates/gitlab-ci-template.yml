@@ -45,7 +45,9 @@ archive:
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
-  needs: [import]
+  needs:
+    - extract  # Need artifacts (bundles + metadata)
+    - import   # Need to run after import completes
   artifacts:
     paths:
       - archives/
