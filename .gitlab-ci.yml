@@ -10,11 +10,11 @@ stages:
 default:
   image: almalinux:8
   before_script:
-    # Install Python 3.11 and yq on AlmaLinux 8
-    - dnf install -y -q git bash epel-release
+    # Install Python 3.11 from standard DNF repositories
+    - dnf install -y -q git bash
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML yq --quiet
+    - pip3.11 install PyYAML --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 # ============================================================
@@ -37,15 +37,19 @@ validate:
 
 # ============================================================
 # STAGE 2: PREPARE
-# Decides which deployment types to run based on the BOM.
+# Decides which deployment types to run based on the BOM using Python.
 # ============================================================
 
 decide:
   stage: prepare
   script:
-    - echo "Deciding which deployments to run..."
-    - echo "BASELINE_ENABLED=$(yq e '.baseline.enabled // false' boms/deployment.yaml)" >> build.env
-    - echo "FUNCTIONAL_ENABLED=$(yq e '.functional.enabled // false' boms/deployment.yaml)" >> build.env
+    - echo "Deciding which deployments to run using Python..."
+    - |
+      BASELINE_ENABLED=$(python3 -c "import yaml; print(str(yaml.safe_load(open('boms/deployment.yaml')).get('baseline', {}).get('enabled', False)).lower())")
+      echo "BASELINE_ENABLED=${BASELINE_ENABLED}" >> build.env
+    - |
+      FUNCTIONAL_ENABLED=$(python3 -c "import yaml; print(str(yaml.safe_load(open('boms/deployment.yaml')).get('functional', {}).get('enabled', False)).lower())")
+      echo "FUNCTIONAL_ENABLED=${FUNCTIONAL_ENABLED}" >> build.env
     - echo "Decision variables:"
     - cat build.env
   artifacts:
