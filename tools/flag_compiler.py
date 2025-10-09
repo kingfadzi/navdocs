@@ -23,6 +23,35 @@ def load_yaml(file_path):
         return yaml.safe_load(f)
 
 
+def validate_flag_dependencies(profile_flags):
+    """
+    Validate flag dependencies according to PPM documentation.
+
+    Returns: (is_valid, error_messages)
+    """
+    errors = []
+
+    # Rule 1: Flag 22 (replace_portfolio_type) requires Flag 16 (replace_module)
+    if profile_flags.get('replace_portfolio_type', False):
+        if not profile_flags.get('replace_module', False):
+            errors.append(
+                "Flag 22 (replace_portfolio_type) requires Flag 16 (replace_module) to be enabled.\n"
+                "    Documentation: If you want to replace the existing portfolio type, you should also\n"
+                "    replace the existing module (set the Flag 16 to Y)."
+            )
+
+    # Rule 2: Flag 25 (replace_chatbot_intents) requires Flag 7 (replace_report_type)
+    if profile_flags.get('replace_chatbot_intents', False):
+        if not profile_flags.get('replace_report_type', False):
+            errors.append(
+                "Flag 25 (replace_chatbot_intents) requires Flag 7 (replace_report_type) to be enabled.\n"
+                "    Documentation: If you want to replace existing Chatbot intents, you should also\n"
+                "    replace the existing report type (set the Flag 7 to Y)."
+            )
+
+    return len(errors) == 0, errors
+
+
 def build_flag_string(profile_flags, flag_schema):
     """
     Build 25-character Y/N string from profile flags.
@@ -40,6 +69,10 @@ def build_flag_string(profile_flags, flag_schema):
     for flag_def in sorted_schema:
         key = flag_def['key']
         is_enabled = profile_flags.get(key, False)
+
+        # Flag 24 (replace_custom_menu) is special - always replaced regardless of Y/N
+        # For consistency with other flags, we still output the user's value
+        # but note that PPM ignores this flag
 
         # Add 'Y' if enabled, 'N' if not
         if is_enabled:
@@ -71,6 +104,17 @@ def main():
     # Load files
     schema = load_yaml(schema_file)
     profile = load_yaml(profile_file)
+
+    # Validate flag dependencies
+    is_valid, errors = validate_flag_dependencies(profile['flags'])
+    if not is_valid:
+        print(f"ERROR: Flag dependency validation failed for profile '{profile_name}':", file=sys.stderr)
+        print("", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("Please update the profile to fix these dependencies.", file=sys.stderr)
+        sys.exit(1)
 
     # Build flag string
     flag_string = build_flag_string(profile['flags'], schema['flag_schema'])
