@@ -45,11 +45,10 @@ decide:
   stage: prepare
   script:
     - echo "Deciding which deployments to run..."
-    - BASELINE_ENABLED=$(yq e '.baseline.enabled == true' boms/deployment.yaml)
-    - FUNCTIONAL_ENABLED=$(yq e '.functional.enabled == true' boms/deployment.yaml)
-    - echo "BASELINE_ENABLED=$BASELINE_ENABLED" >> build.env
-    - echo "FUNCTIONAL_ENABLED=$FUNCTIONAL_ENABLED" >> build.env
-    - echo "Decision: Baseline enabled is $BASELINE_ENABLED, Functional enabled is $FUNCTIONAL_ENABLED"
+    - echo "BASELINE_ENABLED=$(yq e '.baseline.enabled // false' boms/deployment.yaml)" >> build.env
+    - echo "FUNCTIONAL_ENABLED=$(yq e '.functional.enabled // false' boms/deployment.yaml)" >> build.env
+    - echo "Decision variables:"
+    - cat build.env
   artifacts:
     reports:
       dotenv: build.env
