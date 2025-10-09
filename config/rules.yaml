@@ -66,18 +66,3 @@ max_entities_per_deployment:
   limit: 50
   severity: warning
   message: "Large deployments are harder to troubleshoot. Consider splitting."
-
-# Deployment windows for prod
-enforce_deployment_windows:
-  enabled: false
-  applies_to: [prod]
-  allowed_days: [saturday, sunday]
-  allowed_hours: [0, 1, 2, 3, 4, 5]
-  severity: blocking
-  message: "Production deployments only allowed during maintenance windows"
-
-# Require baseline before functional
-require_baseline_first:
-  enabled: false
-  severity: warning
-  message: "Deploy baseline entities before functional deployments"
