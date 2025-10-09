@@ -2,8 +2,9 @@
 """
 PPM Flag Compiler
 Converts profile flags (YAML) to kMigrator flag string (YYYYYNNNN...)
+(DEMO VERSION - Flag compilation logic)
 
-# Reference: OpenText PPM kMigratorImport.sh Flag Definitions
+# Reference: OpenText PPM kMigrator Import.sh Flag Definitions
 # https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122150_InstallAdmin_Server.htm
 #
 # These 25 flags control how entities are imported:
