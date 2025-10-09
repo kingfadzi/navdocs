@@ -19,7 +19,6 @@ default:
 
 # ============================================================
 # STAGE 1: VALIDATE
-# Validates the consolidated boms/deployment.yaml
 # ============================================================
 
 validate:
@@ -37,7 +36,6 @@ validate:
 
 # ============================================================
 # STAGE 2: PREPARE
-# Decides which deployment types to run based on the BOM using Python.
 # ============================================================
 
 decide:
@@ -65,7 +63,6 @@ decide:
 
 # ============================================================
 # STAGE 3: DEPLOY
-# Triggers the reusable child pipeline for enabled deployments.
 # ============================================================
 
 deploy_baseline:
@@ -79,6 +76,8 @@ deploy_baseline:
     DEPLOYMENT_TYPE: baseline
   rules:
     - if: '$BASELINE_ENABLED == "true"'
+      changes:
+        - boms/deployment.yaml
 
 deploy_functional:
   stage: deploy
@@ -91,3 +90,5 @@ deploy_functional:
     DEPLOYMENT_TYPE: functional
   rules:
     - if: '$FUNCTIONAL_ENABLED == "true"'
+      changes:
+        - boms/deployment.yaml

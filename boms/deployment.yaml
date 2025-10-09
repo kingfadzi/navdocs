@@ -1,5 +1,5 @@
 # boms/deployment.yaml
-version: "3.0.4"
+version: "3.0.5"
 change_request: "CR-12345"
 created_by: "your-name"
 
