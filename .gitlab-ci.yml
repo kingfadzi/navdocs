@@ -3,6 +3,7 @@
 
 stages:
   - validate
+  - prepare
   - deploy
 
 # Default configuration
@@ -36,16 +37,50 @@ validate:
         - boms/deployment.yaml
 
 # ============================================================
-# STAGE 2: DEPLOY
-# Triggers the reusable child pipeline for baseline and/or functional deployments.
+# STAGE 2: PREPARE
+# Decides which deployment types to run based on the BOM.
 # ============================================================
 
-      # This script checks if the 'baseline' section exists and its 'enabled' flag is true.
-      script: 'yq e ".baseline.enabled == true" boms/deployment.yaml | grep -q true'
+decide:
+  stage: prepare
+  script:
+    - echo "Deciding which deployments to run..."
+    - BASELINE_ENABLED=$(yq e '.baseline.enabled == true' boms/deployment.yaml)
+    - FUNCTIONAL_ENABLED=$(yq e '.functional.enabled == true' boms/deployment.yaml)
+    - echo "BASELINE_ENABLED=$BASELINE_ENABLED" >> build.env
+    - echo "FUNCTIONAL_ENABLED=$FUNCTIONAL_ENABLED" >> build.env
+    - echo "Decision: Baseline enabled is $BASELINE_ENABLED, Functional enabled is $FUNCTIONAL_ENABLED"
+  artifacts:
+    reports:
+      dotenv: build.env
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/deployment.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/deployment.yaml
+
+# ============================================================
+# STAGE 3: DEPLOY
+# Triggers the reusable child pipeline for enabled deployments.
+# ============================================================
+
+deploy_baseline:
+  stage: deploy
+  needs: [decide]
+  trigger:
+    include:
+      - local: templates/gitlab-ci-template.yml
+    strategy: depend
+  variables:
+    DEPLOYMENT_TYPE: baseline
+  rules:
+    - if: '$BASELINE_ENABLED == "true"'
 
 deploy_functional:
   stage: deploy
-  needs: [deploy_baseline] # Ensures baseline runs first if present
+  needs: [decide, deploy_baseline] # Ensures baseline runs first if present
   trigger:
     include:
       - local: templates/gitlab-ci-template.yml
@@ -53,12 +88,4 @@ deploy_functional:
   variables:
     DEPLOYMENT_TYPE: functional
   rules:
-    - if: '$CI_COMMIT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "merge_request_event")'
-      changes:
-        - boms/deployment.yaml
-      # This script checks if the 'functional' section exists and its 'enabled' flag is true.
-      exists:
-        - boms/deployment.yaml
-      when: on_success
-      allow_failure: false
-      script: 'yq e ".functional.enabled == true" boms/deployment.yaml | grep -q true'
+    - if: '$FUNCTIONAL_ENABLED == "true"'
