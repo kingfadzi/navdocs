@@ -32,6 +32,6 @@
 
 # Deployment and validation scripts - require platform team
 /tools/deploy.py @platform-team
+/tools/rollback.py @platform-team
 /tools/flag_compiler.py @platform-team
 /tools/validate_bom.py @platform-team
-/tools/nexus_client.py @platform-team
