@@ -1,6 +1,6 @@
 # Baseline BOM
 # Deploy ALL foundational entities (Object Types, Request Headers, Validations, Commands, Environments)
-version: "1.0.19"
+version: "1.0.20"
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
