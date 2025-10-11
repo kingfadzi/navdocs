@@ -112,8 +112,16 @@ def run_extract(script_path, url, entity_id, reference_code=None, server_config=
 
 def _run_extract_local(script_path, url, entity_id, reference_code=None):
     """Extract entity locally (mock mode)."""
-    username = os.environ.get('PPM_USERNAME', 'testuser')
-    password = os.environ.get('PPM_PASSWORD', 'testpass')
+    username = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+    password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+
+    if not username or not password:
+        print("ERROR: PPM credentials not set")
+        print("  Required: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD")
+        sys.exit(1)
+
+    print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
+
     cmd = [
         'bash', script_path, '-username', username, '-password', password,
         '-url', url, '-action', 'Bundle', '-entityId', str(entity_id)
@@ -138,8 +146,15 @@ def _run_extract_local(script_path, url, entity_id, reference_code=None):
 
 def _run_extract_remote(script_path, url, entity_id, reference_code, server_config, config):
     """Extract entity remotely and upload to storage."""
-    username = os.environ.get('PPM_USERNAME', 'testuser')
-    password = os.environ.get('PPM_PASSWORD', 'testpass')
+    username = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+    password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+
+    if not username or not password:
+        print("ERROR: PPM credentials not set")
+        print("  Required: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD")
+        sys.exit(1)
+
+    print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
 
     # Initialize storage and remote executor
     storage = get_storage_backend(config)
@@ -215,8 +230,16 @@ def run_import(script_path, url, bundle_metadata, flags, i18n, refdata, server_c
 
 def _run_import_local(script_path, url, bundle_file, flags, i18n, refdata):
     """Import bundle locally (mock mode)."""
-    username = os.environ.get('PPM_USERNAME', 'testuser')
-    password = os.environ.get('PPM_PASSWORD', 'testpass')
+    username = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+    password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+
+    if not username or not password:
+        print("ERROR: PPM credentials not set")
+        print("  Required: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD")
+        sys.exit(1)
+
+    print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
+
     cmd = [
         'bash', script_path, '-username', username, '-password', password,
         '-url', url, '-action', 'import', '-filename', bundle_file,
@@ -231,8 +254,15 @@ def _run_import_local(script_path, url, bundle_file, flags, i18n, refdata):
 
 def _run_import_remote(script_path, url, bundle_metadata, flags, i18n, refdata, server_config, config):
     """Import bundle from storage to remote server."""
-    username = os.environ.get('PPM_USERNAME', 'testuser')
-    password = os.environ.get('PPM_PASSWORD', 'testpass')
+    username = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+    password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+
+    if not username or not password:
+        print("ERROR: PPM credentials not set")
+        print("  Required: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD")
+        sys.exit(1)
+
+    print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
 
     # Initialize storage and remote executor
     storage = get_storage_backend(config)

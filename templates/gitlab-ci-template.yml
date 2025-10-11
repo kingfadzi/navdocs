@@ -40,11 +40,7 @@ extract:
   stage: extract
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
-    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
-    - export PPM_USERNAME=$username
-    - export PPM_PASSWORD=$password
-    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
-    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
+    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
@@ -56,11 +52,7 @@ import:
   stage: import
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
-    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
-    - export PPM_USERNAME=$username
-    - export PPM_PASSWORD=$password
-    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
-    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
+    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract]
 
@@ -69,11 +61,7 @@ archive:
   stage: archive
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
-    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
-    - export PPM_USERNAME=$username
-    - export PPM_PASSWORD=$password
-    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
-    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
+    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs:
     - extract  # Need metadata artifacts
