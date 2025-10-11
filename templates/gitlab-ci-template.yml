@@ -11,17 +11,6 @@ stages:
   - import
   - archive
 
-# Default configuration
-default:
-  image: almalinux:8
-  before_script:
-    # Install Python 3.11 and system dependencies
-    - dnf install -y -q git bash openssh-clients sshpass
-    - dnf module reset -y python36
-    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML boto3 --quiet
-    - ln -sf /usr/bin/python3.11 /usr/bin/python3
-
 variables:
   # DEPLOYMENT_TYPE and BOM_FILE are passed in from the parent pipeline
   DEPLOYMENT_TYPE: "not-set"
@@ -30,14 +19,6 @@ variables:
 # Vault secret retrieval for PPM dev environment
 .ppm-dev-secrets:
   extends: .vault_retrieve
-  before_script:
-    # Install Python 3.11 and system dependencies
-    - dnf install -y -q git bash openssh-clients sshpass
-    - dnf module reset -y python36
-    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML boto3 --quiet
-    - ln -sf /usr/bin/python3.11 /usr/bin/python3
-    # Now run the vault retrieval (parent's script section will execute after this)
   variables:
     VAULT_ROLE: 'ppm-dev'
     VAULT_SECRET_PATH: 'secret/data/ppm/dev/useast'
