@@ -173,8 +173,10 @@ def _run_extract_remote(script_path, url, entity_id, reference_code, server_conf
     remote_bundle_file = f"{remote_bundle_dir}/{bundle_filename}"
     storage_key = f"bundles/{pipeline_id}/{bundle_filename}"
 
+    ssh_host = server_config['ssh_host']
+
     print(f"Extracting entity {entity_id}" + (f" ({reference_code})" if reference_code else " (ALL)") + f" from {url} (REMOTE → S3)")
-    print(f"Remote: {server_config['ssh_user']}@{server_config['ssh_host']}")
+    print(f"Remote: {username}@{ssh_host}")
 
     try:
         # Step 1: Create remote directory
@@ -276,8 +278,10 @@ def _run_import_remote(script_path, url, bundle_metadata, flags, i18n, refdata, 
     remote_bundle_dir = f"/tmp/ppm-bundles-{pipeline_id}"
     remote_bundle_file = f"{remote_bundle_dir}/{bundle_filename}"
 
+    ssh_host = server_config['ssh_host']
+
     print(f"Importing {bundle_filename} to {url} (S3 → REMOTE)")
-    print(f"Remote: {server_config['ssh_user']}@{server_config['ssh_host']}")
+    print(f"Remote: {username}@{ssh_host}")
 
     try:
         # Step 1: Create remote directory

@@ -14,19 +14,16 @@ class RemoteExecutor:
     def ssh_exec(self, ssh_config, command, env=None):
         """Execute command on remote server via SSH."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = ssh_config.get('ssh_user') or os.environ.get('SSH_USER', 'ppm-deploy')
-        ssh_port = ssh_config.get('ssh_port') or int(os.environ.get('SSH_PORT', '22'))
+        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+        ssh_password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+        ssh_port = ssh_config.get('ssh_port', 22)
 
-        # Derive SSH password variable from env_type: SSH_PASSWORD_{ENV_TYPE}
-        env_type = ssh_config.get('env_type', '').upper()
-        ssh_password_var = ssh_config.get('ssh_password_var') or f"SSH_PASSWORD_{env_type}"
-
-        if ssh_password_var not in os.environ:
-            raise ValueError(f"SSH password not found in environment: {ssh_password_var}")
+        if not ssh_user or not ssh_password:
+            raise ValueError("SSH credentials not found: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD required")
 
         if env is None:
             env = os.environ.copy()
-        env['SSHPASS'] = os.environ[ssh_password_var]
+        env['SSHPASS'] = ssh_password
 
         ssh_cmd = [
             'sshpass', '-e',
@@ -58,8 +55,11 @@ class RemoteExecutor:
     def build_ssh_cmd(self, ssh_config, remote_command):
         """Build sshpass + ssh command list."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = ssh_config.get('ssh_user') or os.environ.get('SSH_USER', 'ppm-deploy')
-        ssh_port = ssh_config.get('ssh_port') or int(os.environ.get('SSH_PORT', '22'))
+        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+        ssh_port = ssh_config.get('ssh_port', 22)
+
+        if not ssh_user:
+            raise ValueError("SSH user not found: PPM_SERVICE_ACCOUNT_USER required")
 
         return [
             'sshpass', '-e',

@@ -22,12 +22,15 @@ s3:
   # Credentials from environment: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 # PPM Server Registry with SSH configuration for remote execution
-# All credentials injected from GitLab CI/CD environment variables:
-#   - PPM_USERNAME, PPM_PASSWORD: PPM application credentials
-#   - SSH_USER: SSH username (default: ppm-deploy)
-#   - SSH_PORT: SSH port (default: 22)
-#   - SSH_PASSWORD_{ENV_TYPE}: SSH password (derived from env_type)
-#     Examples: SSH_PASSWORD_DEV, SSH_PASSWORD_TEST, SSH_PASSWORD_STAGING, SSH_PASSWORD_PROD
+# Credentials injected from GitLab CI/CD environment variables (via Vault):
+#
+# Environment-specific (vault: secret/data/ppm/{env}/useast):
+#   - PPM_SERVICE_ACCOUNT_USER: Service account username (used for both PPM API and SSH)
+#   - PPM_SERVICE_ACCOUNT_PASSWORD: Service account password (used for both PPM API and SSH)
+#
+# Shared across all environments (vault: secret/data/shared/s3):
+#   - ACCESS_KEY_ID → exported as AWS_ACCESS_KEY_ID
+#   - SECRET_ACCESS_KEY → exported as AWS_SECRET_ACCESS_KEY
 servers:
   dev-ppm-useast:
     url: "https://ppm-dev.company.com"

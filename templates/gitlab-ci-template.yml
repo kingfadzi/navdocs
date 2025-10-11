@@ -20,8 +20,12 @@ variables:
 .ppm-dev-secrets:
   extends: .vault_retrieve
   variables:
-    VAULT_ROLE: 'ppm-dev'
-    VAULT_SECRET_PATH: 'secret/data/ppm/dev/useast'
+    VAULT_CONFIGS: |
+      - VAULT_ROLE: ppm-dev
+        VAULT_PATH: secret/data/ppm/dev/useast
+      - VAULT_ROLE: s3-read
+        VAULT_PATH: secret/data/shared/s3
+        PREFIX: AWS_
     VAULT_DEBUG: "true"
 
 extract:
