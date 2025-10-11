@@ -9,11 +9,11 @@ stages:
 default:
   image: almalinux:8
   before_script:
-    # Install Python 3.11 from standard DNF repositories
-    - dnf install -y -q git bash
+    # Install Python 3.11 and system dependencies
+    - dnf install -y -q git bash openssh-clients sshpass
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML --quiet
+    - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 # ============================================================

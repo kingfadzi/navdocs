@@ -2,6 +2,10 @@
 # This is a reusable workflow for a single deployment type (e.g., baseline or functional).
 # It is triggered by the main .gitlab-ci.yml file.
 
+include:
+  - project: 'staging/vault-secret-fetcher'
+    file: '/vault-retrieve.yml'
+
 stages:
   - extract
   - import
@@ -11,11 +15,11 @@ stages:
 default:
   image: almalinux:8
   before_script:
-    # Install Python 3.11 from standard DNF repositories
-    - dnf install -y -q git bash
+    # Install Python 3.11 and system dependencies
+    - dnf install -y -q git bash openssh-clients sshpass
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML --quiet
+    - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 variables:
@@ -23,33 +27,58 @@ variables:
   DEPLOYMENT_TYPE: "not-set"
   BOM_FILE: "not-set"
 
+# Vault secret retrieval for PPM dev environment
+.ppm-dev-secrets:
+  extends: .vault_retrieve
+  variables:
+    VAULT_ROLE: 'ppm-dev'
+    VAULT_SECRET_PATH: 'secret/data/ppm/dev/useast'
+
 extract:
+  extends: .ppm-dev-secrets
   stage: extract
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
+    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
+    - export PPM_USERNAME=$username
+    - export PPM_PASSWORD=$password
+    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
+    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
-      - bundles/
+      - bundles/*.yaml  # Only metadata YAML, not XML bundle files
     expire_in: 1 hour
 
 import:
+  extends: .ppm-dev-secrets
   stage: import
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
+    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
+    - export PPM_USERNAME=$username
+    - export PPM_PASSWORD=$password
+    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
+    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
     - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract]
 
 archive:
+  extends: .ppm-dev-secrets
   stage: archive
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
+    - echo "Fetching credentials from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
+    - export PPM_USERNAME=$username
+    - export PPM_PASSWORD=$password
+    - echo "✓ PPM_USERNAME retrieved from Vault (length=${#PPM_USERNAME})"
+    - echo "✓ PPM_PASSWORD retrieved from Vault (length=${#PPM_PASSWORD})"
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs:
-    - extract  # Need artifacts (bundles + metadata)
+    - extract  # Need metadata artifacts
     - import   # Need to run after import completes
   artifacts:
     paths:
-      - archives/
+      - archives/*.yaml  # Only rollback manifests, not bundle ZIPs (bundles in S3)
       - evidence/
     expire_in: 1 year

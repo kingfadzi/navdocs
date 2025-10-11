@@ -1,49 +1,54 @@
-# Deployment Configuration
+# Production Deployment Configuration
+# This is the default configuration used in production CI/CD pipelines
+# For local testing, create deployment-config.local.yaml to override these settings
 
-# kMigrator script paths
-# Point to mock scripts for testing, or real PPM installation scripts for production
+# kMigrator real installation paths (remote execution on PPM servers)
 kmigrator:
-  extract_script: "./mock/kMigratorExtract.sh"
-  import_script: "./mock/kMigratorImport.sh"
-
-  # For production, use real PPM paths:
-  # extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
-  # import_script: "/opt/ppm/bin/kMigratorImport.sh"
+  extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
+  import_script: "/opt/ppm/bin/kMigratorImport.sh"
 
 # Deployment settings
 deployment:
   bundle_dir: "./bundles"
   archive_dir: "./archives"
+  storage_backend: "s3"  # S3 storage (bundles go directly: PPM → S3 → PPM)
 
-# GitLab artifact settings (for rollback)
-# Artifacts stored automatically by GitLab CI/CD
-# No external storage configuration needed
-# Rollback uses pipeline ID: rollback_pipeline_id: 12345
-# Works with both GitLab.com and on-prem GitLab instances
+# S3/MinIO configuration
+s3:
+  bucket_name: "ppm-deployment-bundles"
+  region: "us-east-1"
+  prefix: "bundles/"
+  endpoint_url: "http://phobos:9002"
+  # Credentials from environment: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
-# PPM Server Registry
-# Format: {env_type}-ppm-{region}
+# PPM Server Registry with SSH configuration for remote execution
+# All credentials injected from GitLab CI/CD environment variables:
+#   - PPM_USERNAME, PPM_PASSWORD: PPM application credentials
+#   - SSH_USER: SSH username (default: ppm-deploy)
+#   - SSH_PORT: SSH port (default: 22)
+#   - SSH_PASSWORD_{ENV_TYPE}: SSH password (derived from env_type)
+#     Examples: SSH_PASSWORD_DEV, SSH_PASSWORD_TEST, SSH_PASSWORD_STAGING, SSH_PASSWORD_PROD
 servers:
   dev-ppm-useast:
     url: "https://ppm-dev.company.com"
     env_type: dev
-    credential_path: "/secrets/ppm-dev"
     region: useast
+    ssh_host: "ppm-dev-internal.company.com"
 
   test-ppm-useast:
     url: "https://ppm-test.company.com"
     env_type: test
-    credential_path: "/secrets/ppm-test"
     region: useast
+    ssh_host: "ppm-test-internal.company.com"
 
   staging-ppm-useast:
     url: "https://ppm-staging.company.com"
     env_type: staging
-    credential_path: "/secrets/ppm-staging"
     region: useast
+    ssh_host: "ppm-staging-internal.company.com"
 
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
     env_type: prod
-    credential_path: "/secrets/ppm-prod"
     region: useast
+    ssh_host: "ppm-prod-internal.company.com"
