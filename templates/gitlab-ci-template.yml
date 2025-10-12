@@ -31,8 +31,10 @@ extract:
   extends: .vault_dynamic_base
   stage: extract
   before_script:
-    # Extract needs SOURCE server credentials
+    # Set VAULT_CONFIGS dynamically from BOM source_server
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE extract)"
+    # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
+    - !reference [.vault_retrieve, before_script]
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
@@ -45,8 +47,10 @@ import:
   extends: .vault_dynamic_base
   stage: import
   before_script:
-    # Import needs TARGET server credentials
+    # Set VAULT_CONFIGS dynamically from BOM target_server
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE import)"
+    # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
+    - !reference [.vault_retrieve, before_script]
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
@@ -56,8 +60,10 @@ archive:
   extends: .vault_dynamic_base
   stage: archive
   before_script:
-    # Archive needs TARGET server credentials
+    # Set VAULT_CONFIGS dynamically from BOM target_server
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE archive)"
+    # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
+    - !reference [.vault_retrieve, before_script]
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
