@@ -32,7 +32,11 @@ extract:
   stage: extract
   before_script:
     # Set VAULT_CONFIGS dynamically from BOM source_server
+    - echo "DEBUG - Generating VAULT_CONFIGS for extract stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE extract)"
+    - echo "DEBUG - VAULT_CONFIGS set to:"
+    - echo "$VAULT_CONFIGS"
+    - echo "DEBUG - Calling vault fetcher before_script..."
     # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
     - !reference [.vault_retrieve, before_script]
   script:
@@ -48,7 +52,11 @@ import:
   stage: import
   before_script:
     # Set VAULT_CONFIGS dynamically from BOM target_server
+    - echo "DEBUG - Generating VAULT_CONFIGS for import stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE import)"
+    - echo "DEBUG - VAULT_CONFIGS set to:"
+    - echo "$VAULT_CONFIGS"
+    - echo "DEBUG - Calling vault fetcher before_script..."
     # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
     - !reference [.vault_retrieve, before_script]
   script:
@@ -61,7 +69,11 @@ archive:
   stage: archive
   before_script:
     # Set VAULT_CONFIGS dynamically from BOM target_server
+    - echo "DEBUG - Generating VAULT_CONFIGS for archive stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE archive)"
+    - echo "DEBUG - VAULT_CONFIGS set to:"
+    - echo "$VAULT_CONFIGS"
+    - echo "DEBUG - Calling vault fetcher before_script..."
     # Now call the vault fetcher's before_script (which will read $VAULT_CONFIGS)
     - !reference [.vault_retrieve, before_script]
   script:
