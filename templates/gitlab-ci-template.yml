@@ -31,10 +31,12 @@ extract:
   extends: .vault_dynamic_base
   stage: extract
   before_script:
-    # Install Python first so we can run setup_vault_configs.py
-    - dnf install -y -q python3.11
+    # Install Python 3.11 and system dependencies (needed to run setup_vault_configs.py)
+    - dnf install -y -q git bash openssh-clients sshpass
+    - dnf module reset -y python36
+    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
+    - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
-    - pip3.11 install PyYAML --quiet
     # Set VAULT_CONFIGS dynamically from BOM source_server
     - echo "DEBUG - Generating VAULT_CONFIGS for extract stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE extract)"
@@ -55,10 +57,12 @@ import:
   extends: .vault_dynamic_base
   stage: import
   before_script:
-    # Install Python first so we can run setup_vault_configs.py
-    - dnf install -y -q python3.11
+    # Install Python 3.11 and system dependencies (needed to run setup_vault_configs.py)
+    - dnf install -y -q git bash openssh-clients sshpass
+    - dnf module reset -y python36
+    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
+    - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
-    - pip3.11 install PyYAML --quiet
     # Set VAULT_CONFIGS dynamically from BOM target_server
     - echo "DEBUG - Generating VAULT_CONFIGS for import stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE import)"
@@ -76,10 +80,12 @@ archive:
   extends: .vault_dynamic_base
   stage: archive
   before_script:
-    # Install Python first so we can run setup_vault_configs.py
-    - dnf install -y -q python3.11
+    # Install Python 3.11 and system dependencies (needed to run setup_vault_configs.py)
+    - dnf install -y -q git bash openssh-clients sshpass
+    - dnf module reset -y python36
+    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
+    - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
-    - pip3.11 install PyYAML --quiet
     # Set VAULT_CONFIGS dynamically from BOM target_server
     - echo "DEBUG - Generating VAULT_CONFIGS for archive stage..."
     - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE archive)"
