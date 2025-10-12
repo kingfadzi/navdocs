@@ -30,9 +30,9 @@ variables:
 extract:
   extends: .vault_dynamic_base
   stage: extract
-  variables:
+  before_script:
     # Extract needs SOURCE server credentials
-    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE extract)
+    - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE extract)"
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
@@ -44,9 +44,9 @@ extract:
 import:
   extends: .vault_dynamic_base
   stage: import
-  variables:
+  before_script:
     # Import needs TARGET server credentials
-    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE import)
+    - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE import)"
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
@@ -55,9 +55,9 @@ import:
 archive:
   extends: .vault_dynamic_base
   stage: archive
-  variables:
+  before_script:
     # Archive needs TARGET server credentials
-    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE archive)
+    - export VAULT_CONFIGS="$(python3 tools/setup_vault_configs.py $BOM_FILE archive)"
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
