@@ -551,6 +551,24 @@ def validate_bom_before_action(bom_file):
     print()
 
 
+def get_vault_config_command(server_name):
+    """Extract CI Vault configuration for a server."""
+    config = load_config()
+
+    if server_name not in config['servers']:
+        print(f"Error: Server '{server_name}' not found in configuration", file=sys.stderr)
+        sys.exit(1)
+
+    server_config = config['servers'][server_name]
+
+    if 'ci_vault_configs' not in server_config:
+        print(f"Error: No ci_vault_configs defined for server '{server_name}'", file=sys.stderr)
+        sys.exit(1)
+
+    # Print raw string value (no modification)
+    print(server_config['ci_vault_configs'])
+
+
 def deploy_command(bom_file, deployment_type):
     """
     One-shot deployment that runs the full extract -> import -> archive sequence.
@@ -594,16 +612,29 @@ Examples:
 
   # Manual rollback command
   deploy.py rollback --type functional --bom boms/functional.yaml
+
+  # Get Vault config for CI/CD
+  deploy.py get-vault-config --server dev-ppm-useast
         """
     )
-    parser.add_argument('command', choices=['extract', 'import', 'archive', 'rollback', 'deploy'], help='Deployment command')
-    parser.add_argument('--bom', required=True, help='BOM file path (e.g., boms/baseline.yaml or boms/functional.yaml)')
+    parser.add_argument('command', choices=['extract', 'import', 'archive', 'rollback', 'deploy', 'get-vault-config'], help='Deployment command')
+    parser.add_argument('--bom', help='BOM file path (e.g., boms/baseline.yaml or boms/functional.yaml)')
     parser.add_argument('--type', choices=['baseline', 'functional'], help="Deployment type")
+    parser.add_argument('--server', help='Server name (e.g., dev-ppm-useast)')
     args = parser.parse_args()
 
-    if args.command in ['extract', 'import', 'archive', 'deploy', 'rollback'] and not args.type:
-        parser.error(f"{args.command} requires --type argument (baseline or functional)")
+    # Validate required arguments for each command
+    if args.command in ['extract', 'import', 'archive', 'deploy', 'rollback']:
+        if not args.bom:
+            parser.error(f"{args.command} requires --bom argument")
+        if not args.type:
+            parser.error(f"{args.command} requires --type argument (baseline or functional)")
 
+    if args.command == 'get-vault-config':
+        if not args.server:
+            parser.error("get-vault-config requires --server argument")
+
+    # Execute command
     if args.command == 'extract':
         extract_command(args.bom, args.type)
     elif args.command == 'import':
@@ -614,6 +645,8 @@ Examples:
         deploy_command(args.bom, args.type)
     elif args.command == 'rollback':
         rollback.rollback(args.bom, args.type)
+    elif args.command == 'get-vault-config':
+        get_vault_config_command(args.server)
 
 if __name__ == '__main__':
     main()

@@ -37,23 +37,47 @@ servers:
     env_type: dev
     region: useast
     ssh_host: "ppm-dev-internal.company.com"
+    ci_vault_configs: |
+      - VAULT_ROLE: ppm-dev
+        VAULT_PATH: secret/data/ppm/dev/useast
+      - VAULT_ROLE: s3-read
+        VAULT_PATH: secret/data/shared/s3
+        PREFIX: AWS_
 
   test-ppm-useast:
     url: "https://ppm-test.company.com"
     env_type: test
     region: useast
     ssh_host: "ppm-test-internal.company.com"
+    ci_vault_configs: |
+      - VAULT_ROLE: ppm-test
+        VAULT_PATH: secret/data/ppm/test/useast
+      - VAULT_ROLE: s3-read
+        VAULT_PATH: secret/data/shared/s3
+        PREFIX: AWS_
 
   staging-ppm-useast:
     url: "https://ppm-staging.company.com"
     env_type: staging
     region: useast
     ssh_host: "ppm-staging-internal.company.com"
+    ci_vault_configs: |
+      - VAULT_ROLE: ppm-staging
+        VAULT_PATH: secret/data/ppm/staging/useast
+      - VAULT_ROLE: s3-read
+        VAULT_PATH: secret/data/shared/s3
+        PREFIX: AWS_
 
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
     env_type: prod
     region: useast
     ssh_host: "ppm-prod-internal.company.com"
-    VAULT_ROLE: smtp-read
-    VAULT_PATH: secret/data/shared/smtp
+    ci_vault_configs: |
+      - VAULT_ROLE: ppm-prod
+        VAULT_PATH: secret/data/ppm/prod/useast
+      - VAULT_ROLE: s3-read
+        VAULT_PATH: secret/data/shared/s3
+        PREFIX: AWS_
+      - VAULT_ROLE: smtp-read
+        VAULT_PATH: secret/data/shared/smtp

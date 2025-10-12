@@ -1,6 +1,10 @@
 # .gitlab-ci-template.yml
 # This is a reusable workflow for a single deployment type (e.g., baseline or functional).
 # It is triggered by the main .gitlab-ci.yml file.
+#
+# Vault configurations are now dynamically determined from deployment-config.yaml
+# based on the source_server (for extract) and target_server (for import/archive)
+# specified in the BOM file.
 
 include:
   - project: 'staging/vault-secret-fetcher'
@@ -16,24 +20,21 @@ variables:
   DEPLOYMENT_TYPE: "not-set"
   BOM_FILE: "not-set"
 
-# Vault secret retrieval for PPM dev environment
-.ppm-dev-secrets:
+# Dynamic Vault configuration base
+# Each job determines the appropriate server credentials from the BOM
+.vault_dynamic_base:
   extends: .vault_retrieve
   variables:
-    VAULT_CONFIGS: |
-      - VAULT_ROLE: ppm-dev
-        VAULT_PATH: secret/data/ppm/dev/useast
-      - VAULT_ROLE: s3-read
-        VAULT_PATH: secret/data/shared/s3
-        PREFIX: AWS_
     VAULT_DEBUG: "true"
 
 extract:
-  extends: .ppm-dev-secrets
+  extends: .vault_dynamic_base
   stage: extract
+  variables:
+    # Extract needs SOURCE server credentials
+    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE extract)
   script:
     - echo "Executing EXTRACT stage for $DEPLOYMENT_TYPE..."
-    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
@@ -41,20 +42,24 @@ extract:
     expire_in: 1 hour
 
 import:
-  extends: .ppm-dev-secrets
+  extends: .vault_dynamic_base
   stage: import
+  variables:
+    # Import needs TARGET server credentials
+    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE import)
   script:
     - echo "Executing IMPORT stage for $DEPLOYMENT_TYPE..."
-    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract]
 
 archive:
-  extends: .ppm-dev-secrets
+  extends: .vault_dynamic_base
   stage: archive
+  variables:
+    # Archive needs TARGET server credentials
+    VAULT_CONFIGS: $(python3 tools/setup_vault_configs.py $BOM_FILE archive)
   script:
     - echo "Executing ARCHIVE stage for $DEPLOYMENT_TYPE..."
-    - echo "Using service account from Vault (role=ppm-dev, path=secret/data/ppm/dev/useast)..."
     - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs:
     - extract  # Need metadata artifacts
