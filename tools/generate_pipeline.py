@@ -12,10 +12,10 @@ def load_yaml(file_path):
 
 def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     """Generates the child pipeline YAML by populating a template."""
-    
+
     bom = load_yaml(bom_file_path)
     deployment_config = load_yaml(config_file_path)
-    
+
     # --- Step 1: Determine Source and Target Roles (The Logic) ---
     source_server = bom.get('source_server')
     target_server = bom.get('target_server')
@@ -28,11 +28,36 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
         print("Error: BOM file must contain source_server.name and target_server.name", file=sys.stderr)
         sys.exit(1)
 
-    # Find the roles from the deployment config
+    # Find the roles and paths from the deployment config
     source_role = deployment_config['servers'][source_server_name]['vault_roles'][0]['name']
+    source_path = deployment_config['servers'][source_server_name]['vault_roles'][0]['path']
     target_role = deployment_config['servers'][target_server_name]['vault_roles'][0]['name']
+    target_path = deployment_config['servers'][target_server_name]['vault_roles'][0]['path']
+    s3_role = deployment_config['s3']['vault_roles'][0]['name']
+    s3_path = deployment_config['s3']['vault_roles'][0]['path']
 
-    # --- Step 2: Populate the Template (The Presentation) ---
+    # --- Step 2: Generate Vault Component Includes ---
+    vault_includes = f"""# Vault component includes for dynamic child pipeline
+include:
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0
+    inputs:
+      anchor_name: 'vault-{source_role}'
+      vault_role: '{source_role}'
+      vault_secret_paths: '["{source_path}"]'
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0
+    inputs:
+      anchor_name: 'vault-{target_role}'
+      vault_role: '{target_role}'
+      vault_secret_paths: '["{target_path}"]'
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0
+    inputs:
+      anchor_name: 'vault-s3'
+      vault_role: '{s3_role}'
+      vault_secret_paths: '["{s3_path}"]'
+
+"""
+
+    # --- Step 3: Populate the Template (The Presentation) ---
     with open(template_file_path, 'r') as f:
         template_content = f.read()
 
@@ -40,8 +65,8 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     pipeline_content = template_content.replace('%%SOURCE_ROLE%%', source_role)
     pipeline_content = pipeline_content.replace('%%TARGET_ROLE%%', target_role)
 
-    # --- Step 3: Output the final YAML ---
-    print(pipeline_content)
+    # --- Step 4: Output the final YAML with includes prepended ---
+    print(vault_includes + pipeline_content)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generate GitLab CI child pipeline for PPM deployment.")
