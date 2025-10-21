@@ -68,6 +68,9 @@ validate_functional:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - $BOM_FILE
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - $BOM_FILE
 
 .trigger_template:
   stage: deploy
@@ -77,6 +80,9 @@ validate_functional:
     DEPLOYMENT_TYPE: $DEPLOYMENT_TYPE
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - $BOM_FILE
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - $BOM_FILE
 
