@@ -1,88 +1,123 @@
 # Main PPM Deployment Pipeline
-# This pipeline validates baseline and functional BOMs and triggers deployments based on file changes.
+# This pipeline validates BOMs and triggers dynamic child pipelines for deployment.
 
 stages:
   - validate
+  - prepare
   - deploy
 
-# Default configuration
-default:
-  image: almalinux:8
-  before_script:
-    # Install Python 3.11 and system dependencies
-    - dnf install -y -q git bash openssh-clients sshpass
-    - dnf module reset -y python36
-    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML boto3 --quiet
-    - ln -sf /usr/bin/python3.11 /usr/bin/python3
+# ============================================================
+# COMPONENT INCLUDES
+# Statically define all possible Vault roles the pipeline may need.
+# The generated child pipeline will select which ones to extend.
+# ============================================================
+include:
+  # --- PPM Environment Roles ---
+  - component: 'eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0'
+    inputs:
+      anchor_name: 'vault-ppm-dev'
+      vault_role: 'ppm-dev'
+      vault_secret_paths: ['secret/data/ppm/dev/useast']
+  - component: 'eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0'
+    inputs:
+      anchor_name: 'vault-ppm-test'
+      vault_role: 'ppm-test'
+      vault_secret_paths: ['secret/data/ppm/test/useast']
+  # Add other environments like staging, prod here...
+
+  # --- Shared Service Roles ---
+  - component: 'eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0'
+    inputs:
+      anchor_name: 'vault-s3'
+      vault_role: 's3-read'
+      vault_secret_paths: ['secret/data/shared/s3']
 
 # ============================================================
 # STAGE 1: VALIDATE
+# (No changes needed here)
 # ============================================================
-
 validate_baseline:
   stage: validate
   script:
-    - echo "Validating baseline BOM..."
     - python3 tools/validate_bom.py --file boms/baseline.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - boms/baseline.yaml
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - boms/baseline.yaml
 
 validate_functional:
   stage: validate
   script:
-    - echo "Validating functional BOM..."
     - python3 tools/validate_bom.py --file boms/functional.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+
+# ============================================================
+# TEMPLATES FOR DRY WORKFLOWS
+# ============================================================
+.generate_template:
+  stage: prepare
+  script:
+    - python3 tools/generate_pipeline.py --bom $BOM_FILE > $ARTIFACT_NAME
+  artifacts:
+    paths:
+      - $ARTIFACT_NAME
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
-        - boms/functional.yaml
+        - $BOM_FILE
 
-# ============================================================
-# STAGE 2: DEPLOY
-# ============================================================
-
-deploy_baseline:
+.trigger_template:
   stage: deploy
   trigger:
     include:
-      - local: templates/gitlab-ci-template.yml
+      - artifact: $ARTIFACT_NAME
+        job: $ARTIFACT_JOB
     strategy: depend
+  # Pass variables down to the child pipeline
   variables:
-    DEPLOYMENT_TYPE: baseline
+    BOM_FILE: $BOM_FILE
+    DEPLOYMENT_TYPE: $DEPLOYMENT_TYPE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - $BOM_FILE
+
+# ============================================================
+# BASELINE DEPLOYMENT WORKFLOW
+# ============================================================
+generate_baseline_pipeline:
+  extends: .generate_template
+  variables:
     BOM_FILE: boms/baseline.yaml
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - boms/baseline.yaml
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
-      changes:
-        - boms/baseline.yaml
+    ARTIFACT_NAME: baseline-pipeline.yml
 
-deploy_functional:
-  stage: deploy
-  needs:
-    - job: deploy_baseline
-      optional: true  # Only wait if baseline job exists
-  trigger:
-    include:
-      - local: templates/gitlab-ci-template.yml
-    strategy: depend
+trigger_baseline_deployment:
+  extends: .trigger_template
   variables:
-    DEPLOYMENT_TYPE: functional
+    BOM_FILE: boms/baseline.yaml
+    ARTIFACT_NAME: baseline-pipeline.yml
+    ARTIFACT_JOB: generate_baseline_pipeline
+    DEPLOYMENT_TYPE: baseline
+
+# ============================================================
+# FUNCTIONAL DEPLOYMENT WORKFLOW
+# ============================================================
+generate_functional_pipeline:
+  extends: .generate_template
+  variables:
     BOM_FILE: boms/functional.yaml
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - boms/functional.yaml
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
-      changes:
-        - boms/functional.yaml
+    ARTIFACT_NAME: functional-pipeline.yml
+
+trigger_functional_deployment:
+  extends: .trigger_template
+  needs:
+    - job: trigger_baseline_deployment
+      optional: true
+  variables:
+    BOM_FILE: boms/functional.yaml
+    ARTIFACT_NAME: functional-pipeline.yml
+    ARTIFACT_JOB: generate_functional_pipeline
+    DEPLOYMENT_TYPE: functional
