@@ -11,7 +11,7 @@ stages:
 .job_base:
   image: almalinux:8
   before_script:
-    - dnf install -y -q git bash openssh-clients sshpass
+    - dnf install -y -q git bash openssh-clients sshpass wget curl
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
     - pip3.11 install PyYAML boto3 --quiet
