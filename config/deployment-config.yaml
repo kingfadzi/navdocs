@@ -19,7 +19,10 @@ s3:
   region: "us-east-1"
   prefix: "bundles/"
   endpoint_url: "http://phobos:9002"
-  # Credentials from environment: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+  # Credentials from Vault
+  vault_roles:
+    - name: s3-read
+      path: secret/data/shared/s3
 
 # PPM Server Registry with SSH configuration for remote execution
 # Credentials injected from GitLab CI/CD environment variables (via Vault):
@@ -29,55 +32,41 @@ s3:
 #   - PPM_SERVICE_ACCOUNT_PASSWORD: Service account password (used for both PPM API and SSH)
 #
 # Shared across all environments (vault: secret/data/shared/s3):
-#   - ACCESS_KEY_ID → exported as AWS_ACCESS_KEY_ID
-#   - SECRET_ACCESS_KEY → exported as AWS_SECRET_ACCESS_KEY
+#   - AWS_ACCESS_KEY_ID: S3/MinIO access key
+#   - AWS_SECRET_ACCESS_KEY: S3/MinIO secret key
 servers:
   dev-ppm-useast:
     url: "https://ppm-dev.company.com"
     env_type: dev
     region: useast
     ssh_host: "ppm-dev-internal.company.com"
-    ci_vault_configs: |
-      - VAULT_ROLE: ppm-dev
-        VAULT_PATH: secret/data/ppm/dev/useast
-      - VAULT_ROLE: s3-read
-        VAULT_PATH: secret/data/shared/s3
-        PREFIX: AWS_
+    vault_roles:
+      - name: ppm-dev
+        path: secret/data/ppm/dev/useast
 
   test-ppm-useast:
     url: "https://ppm-test.company.com"
     env_type: test
     region: useast
     ssh_host: "ppm-test-internal.company.com"
-    ci_vault_configs: |
-      - VAULT_ROLE: ppm-test
-        VAULT_PATH: secret/data/ppm/test/useast
-      - VAULT_ROLE: s3-read
-        VAULT_PATH: secret/data/shared/s3
-        PREFIX: AWS_
+    vault_roles:
+      - name: ppm-test
+        path: secret/data/ppm/test/useast
 
   staging-ppm-useast:
     url: "https://ppm-staging.company.com"
     env_type: staging
     region: useast
     ssh_host: "ppm-staging-internal.company.com"
-    ci_vault_configs: |
-      - VAULT_ROLE: ppm-staging
-        VAULT_PATH: secret/data/ppm/staging/useast
-      - VAULT_ROLE: s3-read
-        VAULT_PATH: secret/data/shared/s3
-        PREFIX: AWS_
+    vault_roles:
+      - name: ppm-staging
+        path: secret/data/ppm/staging/useast
 
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
     env_type: prod
     region: useast
     ssh_host: "ppm-prod-internal.company.com"
-    ci_vault_configs: |
-      - VAULT_ROLE: ppm-prod
-        VAULT_PATH: secret/data/ppm/prod/useast
-      - VAULT_ROLE: s3-read
-        VAULT_PATH: secret/data/shared/s3
-        PREFIX: AWS_
-      - VAULT_ROLE: smtp-read
-        VAULT_PATH: secret/data/shared/smtp
+    vault_roles:
+      - name: ppm-prod
+        path: secret/data/ppm/prod/useast
