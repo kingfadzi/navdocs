@@ -2,6 +2,11 @@
 # This is a template for the dynamically generated child pipeline.
 # The generator script will replace %%SOURCE_ROLE%% and %%TARGET_ROLE%%.
 
+# Global defaults - runs before all jobs
+default:
+  before_script:
+    - dnf install -y -q wget curl
+
 stages:
   - extract
   - import
