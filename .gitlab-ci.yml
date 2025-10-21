@@ -97,6 +97,8 @@ generate_baseline_pipeline:
 
 trigger_baseline_deployment:
   extends: .trigger_template
+  needs:
+    - job: generate_baseline_pipeline
   variables:
     BOM_FILE: boms/baseline.yaml
     ARTIFACT_NAME: baseline-pipeline.yml
@@ -119,6 +121,7 @@ generate_functional_pipeline:
 trigger_functional_deployment:
   extends: .trigger_template
   needs:
+    - job: generate_functional_pipeline
     - job: trigger_baseline_deployment
       optional: true
   variables:
