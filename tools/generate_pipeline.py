@@ -17,8 +17,12 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     deployment_config = load_yaml(config_file_path)
     
     # --- Step 1: Determine Source and Target Roles (The Logic) ---
-    source_server_name = bom.get('source_server', {}).get('name')
-    target_server_name = bom.get('target_server', {}).get('name')
+    source_server = bom.get('source_server')
+    target_server = bom.get('target_server')
+
+    # Handle both string and dict formats for server names
+    source_server_name = source_server.get('name') if isinstance(source_server, dict) else source_server
+    target_server_name = target_server.get('name') if isinstance(target_server, dict) else target_server
 
     if not source_server_name or not target_server_name:
         print("Error: BOM file must contain source_server.name and target_server.name", file=sys.stderr)
