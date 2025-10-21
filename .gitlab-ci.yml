@@ -71,11 +71,6 @@ validate_functional:
 
 .trigger_template:
   stage: deploy
-  trigger:
-    include:
-      - artifact: $ARTIFACT_NAME
-        job: $ARTIFACT_JOB
-    strategy: depend
   # Pass variables down to the child pipeline
   variables:
     BOM_FILE: $BOM_FILE
@@ -99,8 +94,12 @@ trigger_baseline_deployment:
   variables:
     BOM_FILE: boms/baseline.yaml
     ARTIFACT_NAME: baseline-pipeline.yml
-    ARTIFACT_JOB: generate_baseline_pipeline
     DEPLOYMENT_TYPE: baseline
+  trigger:
+    include:
+      - artifact: $ARTIFACT_NAME
+        job: generate_baseline_pipeline
+    strategy: depend
 
 # ============================================================
 # FUNCTIONAL DEPLOYMENT WORKFLOW
@@ -119,5 +118,9 @@ trigger_functional_deployment:
   variables:
     BOM_FILE: boms/functional.yaml
     ARTIFACT_NAME: functional-pipeline.yml
-    ARTIFACT_JOB: generate_functional_pipeline
     DEPLOYMENT_TYPE: functional
+  trigger:
+    include:
+      - artifact: $ARTIFACT_NAME
+        job: generate_functional_pipeline
+    strategy: depend
