@@ -17,12 +17,12 @@ include:
     inputs:
       anchor_name: 'vault-ppm-dev'
       vault_role: 'ppm-dev'
-      vault_secret_paths: ['secret/data/ppm/dev/useast']
+      vault_secret_paths: '["secret/data/ppm/dev/useast"]'
   - component: 'eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@1.0.0'
     inputs:
       anchor_name: 'vault-ppm-test'
       vault_role: 'ppm-test'
-      vault_secret_paths: ['secret/data/ppm/test/useast']
+      vault_secret_paths: '["secret/data/ppm/test/useast"]'
   # Add other environments like staging, prod here...
 
   # --- Shared Service Roles ---
@@ -30,7 +30,7 @@ include:
     inputs:
       anchor_name: 'vault-s3'
       vault_role: 's3-read'
-      vault_secret_paths: ['secret/data/shared/s3']
+      vault_secret_paths: '["secret/data/shared/s3"]'
 
 # ============================================================
 # STAGE 1: VALIDATE
