@@ -360,44 +360,366 @@ python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/fun
 
 ---
 
+## Local Testing Setup
+
+The deployment system supports local testing without SSH or S3 using the **Local Executor** and configuration overrides.
+
+### **Step 1: Create Local Configuration Override**
+
+Create `config/deployment-config.local.yaml` to override production settings:
+
+```yaml
+# config/deployment-config.local.yaml
+# Local development overrides (merged into deployment-config.yaml when DEPLOYMENT_ENV=local)
+
+servers:
+  dev-ppm-useast:
+    url: "https://dev-ppm-useast.example.com:8443"
+    ssh_host: null  # Disable SSH - use local executor
+    ssh_username_env: null
+    ssh_password_env: null
+
+  test-ppm-useast:
+    url: "https://test-ppm-useast.example.com:8443"
+    ssh_host: null  # Disable SSH - use local executor
+    ssh_username_env: null
+    ssh_password_env: null
+
+# Use local storage (no S3)
+deployment:
+  storage_backend: local
+
+# Default credentials for kMigrator (uses local env vars)
+default_credentials:
+  ssh_username_env: PPM_USERNAME
+  ssh_password_env: PPM_PASSWORD
+
+# Local paths to mock kMigrator scripts
+kmigrator:
+  extract_script: "/path/to/local/kMigratorExtract.sh"
+  import_script: "/path/to/local/kMigratorImport.sh"
+```
+
+**Key Points:**
+- Set `ssh_host: null` to disable SSH and use Local Executor
+- Set `storage_backend: local` to skip S3 and use local filesystem
+- Use simple env var names (`PPM_USERNAME`, `PPM_PASSWORD`) instead of production vars
+- This file is gitignored - safe for local credentials
+
+### **Step 2: Set Local Environment Variables**
+
+```bash
+# Export local mode flag
+export DEPLOYMENT_ENV=local
+
+# Export PPM credentials (for kMigrator scripts)
+export PPM_USERNAME=your_ppm_username
+export PPM_PASSWORD=your_ppm_password
+
+# Verify configuration will merge correctly
+python3 -c "from tools.deployment.utils import load_config; import yaml; print(yaml.dump(load_config(), default_flow_style=False))"
+```
+
+### **Step 3: Mock kMigrator Scripts (Optional)**
+
+For testing without actual PPM servers, create mock scripts:
+
+```bash
+#!/bin/bash
+# mock/kMigratorExtract.sh
+echo "Mock extract: $@"
+echo "Creating mock bundle..."
+echo '<?xml version="1.0"?><bundle><entity>Mock Entity</entity></bundle>' > /tmp/mock_bundle_$$.xml
+echo "Bundle created: /tmp/mock_bundle_$$.xml"
+exit 0
+```
+
+```bash
+#!/bin/bash
+# mock/kMigratorImport.sh
+echo "Mock import: $@"
+echo "Mock import successful"
+exit 0
+```
+
+Update `deployment-config.local.yaml` to point to mock scripts:
+```yaml
+kmigrator:
+  extract_script: "/path/to/mock/kMigratorExtract.sh"
+  import_script: "/path/to/mock/kMigratorImport.sh"
+```
+
+### **Step 4: Run Local Deployment**
+
+**Full Deployment (Extract → Import → Archive):**
+```bash
+export DEPLOYMENT_ENV=local
+python3 -m tools.deployment.orchestrator deploy \
+  --type functional \
+  --bom boms/functional.yaml
+```
+
+**Individual Stages:**
+```bash
+# Extract only
+export DEPLOYMENT_ENV=local
+python3 -m tools.deployment.orchestrator extract \
+  --type baseline \
+  --bom boms/baseline.yaml
+
+# Import only (after extract)
+python3 -m tools.deployment.orchestrator import \
+  --type baseline \
+  --bom boms/baseline.yaml
+
+# Archive only (after import)
+python3 -m tools.deployment.orchestrator archive \
+  --type baseline \
+  --bom boms/baseline.yaml
+```
+
+### **Step 5: Verify Local Execution**
+
+**Expected Behavior with Local Executor:**
+```
+==========================================================
+PHASE 1: EXTRACT (FUNCTIONAL)
+==========================================================
+Source: dev-ppm-useast, Target: test-ppm-useast, Profile: functional-cd
+Storage: LOCAL
+Executor: LocalExecutor
+Flags: NYNNNYYYYNNNYNYYYYYYYYYYN
+
+Extracting 3 functional entities...
+
+Executing: /path/to/kMigratorExtract.sh -username your_ppm_username -password *** -url https://dev-ppm-useast.example.com:8443 -action Bundle -entityId 9 -referenceCode WF_INCIDENT_MGMT
+
+✓ Extracted 3 bundles for functional
+Saved metadata: bundles/functional-metadata.yaml
+```
+
+**Key Indicators of Local Mode:**
+- `Storage: LOCAL` (not S3)
+- `Executor: LocalExecutor` (not RemoteExecutor)
+- No SSH connection messages
+- Bundles saved to `bundles/` directory (not uploaded to S3)
+
+### **Step 6: Test Rollback Locally**
+
+```bash
+# After successful local deployment
+export DEPLOYMENT_ENV=local
+
+# Update BOM file with rollback_pipeline_id: local
+# Then run rollback
+python3 -m tools.deployment.orchestrator rollback \
+  --type functional \
+  --bom boms/functional.yaml
+```
+
+**Local Rollback Behavior:**
+- Reads from `archives/` directory (no GitLab artifact download)
+- Uses `ROLLBACK_MANIFEST.yaml` from last local deployment
+- Redeploys bundles using original flags
+
+### **Local Testing Workflow**
+
+**Typical Development Cycle:**
+```bash
+# 1. Set local mode
+export DEPLOYMENT_ENV=local
+export PPM_USERNAME=your_username
+export PPM_PASSWORD=your_password
+
+# 2. Edit BOM file (e.g., add new workflow entity)
+vim boms/functional.yaml
+
+# 3. Validate BOM
+python3 -m tools.config.validation --file boms/functional.yaml
+
+# 4. Test deployment locally
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
+
+# 5. Verify archives created
+ls -lh archives/
+cat archives/ROLLBACK_MANIFEST.yaml
+
+# 6. Test rollback
+# Edit boms/functional.yaml: rollback_pipeline_id: local
+python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
+
+# 7. If everything works, commit and push
+git add boms/functional.yaml
+git commit -m "Add incident management workflow"
+git push
+```
+
+### **Common Pitfalls**
+
+**Error: "Missing PPM credentials"**
+```
+ERROR: PPM credentials not set
+  Required: PPM_USERNAME and PPM_PASSWORD
+```
+**Solution:** Export environment variables before running:
+```bash
+export PPM_USERNAME=your_username
+export PPM_PASSWORD=your_password
+```
+
+**Error: "SSH connection failed" (in local mode)**
+```
+ERROR: Could not establish SSH connection to dev-ppm-useast
+```
+**Solution:** Verify `deployment-config.local.yaml` has `ssh_host: null`:
+```yaml
+servers:
+  dev-ppm-useast:
+    ssh_host: null  # Must be null for local executor
+```
+
+**Error: "S3 bucket not configured" (in local mode)**
+```
+ERROR: S3 bucket 'ppm-deployment-snapshots' not accessible
+```
+**Solution:** Set storage backend to local in `deployment-config.local.yaml`:
+```yaml
+deployment:
+  storage_backend: local  # Not s3
+```
+
+**Error: "Config file not found"**
+```
+FileNotFoundError: config/deployment-config.yaml
+```
+**Solution:** Run scripts from repository root directory:
+```bash
+cd /path/to/navdocs
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
+```
+
+### **Differences: Local vs Production**
+
+| **Aspect** | **Local (DEPLOYMENT_ENV=local)** | **Production (CI/CD)** |
+|------------|-----------------------------------|------------------------|
+| **Executor** | LocalExecutor (direct execution) | RemoteExecutor (SSH + SCP) |
+| **Storage** | Local filesystem (`bundles/`, `archives/`) | S3/MinIO (permanent retention) |
+| **Credentials** | `PPM_USERNAME`, `PPM_PASSWORD` | Vault-injected (`PPM_SERVICE_ACCOUNT_*`) |
+| **Configuration** | Merged: base + local override | Base only (`deployment-config.yaml`) |
+| **kMigrator Location** | Local filesystem paths | Remote server paths |
+| **Rollback Source** | Local `archives/` directory | GitLab artifacts → S3 → local |
+| **Evidence Package** | Created locally | Uploaded to S3 + GitLab artifacts |
+| **Best For** | Development, testing, BOM validation | Production deployments, rollback |
+
+### **Advanced: Testing Remote Executor Locally**
+
+To test SSH/S3 functionality without CI/CD:
+
+```bash
+# 1. Set local mode
+export DEPLOYMENT_ENV=local
+
+# 2. Configure ssh_host in deployment-config.local.yaml
+servers:
+  dev-ppm-useast:
+    ssh_host: "dev-server.example.com"  # Enable SSH
+    ssh_username_env: PPM_USERNAME
+    ssh_password_env: PPM_PASSWORD
+
+# 3. Configure S3 (MinIO local instance)
+deployment:
+  storage_backend: s3
+
+storage:
+  s3:
+    endpoint_url: "http://localhost:9000"  # Local MinIO
+    bucket_name: "test-deployments"
+
+# 4. Export AWS credentials for local MinIO
+export AWS_ACCESS_KEY_ID=minioadmin
+export AWS_SECRET_ACCESS_KEY=minioadmin
+
+# 5. Run deployment (will use RemoteExecutor + S3)
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
+```
+
+This allows testing the full production flow locally with SSH and S3 storage.
+
+---
+
 ## Entity Categories
 
 ### **Baseline Entities** (Infrastructure)
 Must be aligned across ALL environments before continuous deployment.
 
-| Entity | Entity ID | Risk | Change Frequency |
-|--------|-----------|------|------------------|
-| Object Types | 26 | HIGH | Quarterly |
-| Request Header Types | 39 | HIGH | Quarterly |
-| Validations | 13 | MEDIUM | Monthly |
-| User Data Contexts | 37 | MEDIUM | Quarterly |
-| Special Commands | 11 | MEDIUM | As-needed |
-| Environments | 4 | LOW | Rarely |
-| Environment Groups | 58 | LOW | Rarely |
+| **Entity** | **ID** | **What It Does** | **Why It Matters** | **Change Freq** |
+|------------|--------|------------------|--------------------|-----------------|
+| **Object Types** | **26** | Define structure and behavior of objects (requests, projects, packages) | Must match everywhere or request types/projects won't work correctly | Quarterly |
+| **Request Header Types** | **39** | Define fields and layout for request forms | Baseline must be aligned so request types behave the same in every environment | Quarterly |
+| **Validations** | **13** | Define lookup lists and rules for fields | Inconsistent validations cause requests to behave differently across environments | Monthly |
+| **User Data Contexts** | **37** | Define shared user data for custom fields | Keep aligned so environment-specific data is consistent | Quarterly |
+| **Special Commands** | **11** | Reusable backend functions called in workflows | Missing commands break workflow steps | As-needed |
+| **Environments** | **4** | Logical deployment targets referenced in workflows | Missing environments cause package promotion failures | Rarely |
+| **Environment Groups** | **58** | Logical deployment target groups | Missing groups cause package promotion failures | Rarely |
 
-**Philosophy:** Drift is corrected proactively (Add Missing = Y)
+**Philosophy:** Drift is corrected proactively (Add Missing = Y during bootstrap, then N for drift detection)
+
+**Critical Notes:**
+- **Request Statuses** - Part of Request Header Types (Entity ID 39), controlled by Flag 12
+- **Security Groups** - Referenced but NOT migrated automatically; must exist in all environments before workflow deployment
 
 ### **Functional Entities** (Business Logic)
 Deploy frequently once baseline is stable.
 
-| Entity | Entity ID | Risk | Change Frequency |
-|--------|-----------|------|------------------|
-| Workflows | 9 | MEDIUM | Weekly |
-| Request Types | 19 | MEDIUM | Weekly |
-| Report Types | 17 | LOW | Weekly |
-| Overview Page Sections | 61 | LOW | Weekly |
-| Dashboard Modules | 470 | LOW | Weekly |
-| Dashboard Data Sources | 505 | LOW | Weekly |
-| Portlet Definitions | 509 | LOW | Weekly |
-| Project Types | 521 | MEDIUM | Monthly |
-| Work Plan Templates | 522 | LOW | Monthly |
-| Program Types | 901 | MEDIUM | Monthly |
-| Portfolio Types | 903 | MEDIUM | Monthly |
-| OData Data Sources | 906 | LOW | Monthly |
-| Custom Menu | 907 | LOW | As-needed |
-| PPM Integration SDK | 9900 | HIGH | Rarely |
+| **Entity** | **ID** | **What It Does** | **Why It Matters** | **Change Freq** |
+|------------|--------|------------------|--------------------|-----------------|
+| **Workflows** | **9** | Define process flows for requests/projects | Core business logic; safely replaceable once baseline is in place | Weekly |
+| **Request Types** | **19** | Define request forms + link to workflows | Core to business process; promote with replace once baseline is stable | Weekly |
+| **Report Types** | **17** | Define parameterized reports | Frequently updated; safe to always replace | Weekly |
+| **Overview Page Sections** | **61** | Define what appears on overview pages | Safe to promote whenever layout changes | Weekly |
+| **Dashboard Modules** | **470** | Define dashboard pages & layouts | Safe to migrate continuously | Weekly |
+| **Dashboard Data Sources** | **505** | SQL queries behind portlets | Versioned and replaceable | Weekly |
+| **Portlet Definitions** | **509** | Define dashboard widgets | Can be promoted anytime; low risk if baseline is aligned | Weekly |
+| **Project Types** | **521** | Define project templates, policies, lifecycle | Promote during process or template changes | Monthly |
+| **Work Plan Templates** | **522** | Define standard project task breakdowns | Migrated when template changes are approved | Monthly |
+| **Program Types** | **901** | Define program-level structure | Migrated when program governance changes | Monthly |
+| **Portfolio Types** | **903** | Define portfolio containers and hierarchy | Supported entity; safe to promote | Monthly |
+| **OData Data Sources** | **906** | Define OData-backed queries | Supported; **OData links are NOT migrated** | Monthly |
+| **Custom Menu** | **907** | Define custom UI menu entries | UI extension; safe to promote | As-needed |
+| **Chatbot Intent** | **908** | Define chatbot intents (PPM 25.2+) | Optional; for chatbot-enabled environments | As-needed |
+| **PPM Integration SDK** | **9900** | Define PPM Integration SDK objects | Stable but script-supported; promote if used | Rarely |
 
 **Philosophy:** Drift is tolerated (Add Missing = N, baseline handles dependencies)
+
+**Critical Notes:**
+- All functional entities require baseline to exist first (environments, statuses, security groups)
+- OData Data Sources: Only the data source definition migrates; OData links must be manually configured
+- Chatbot Intent: Requires Report Type flag (Flag 7 = Y) when deploying
+- Portfolio Type: Requires Module flag (Flag 16 = Y) when deploying
+
+### **Entity Reference Summary**
+
+**Baseline vs Functional Decision:**
+
+| **If the entity...** | **Then it's...** |
+|----------------------|------------------|
+| Changes break existing workflows/requests | **Baseline** |
+| Defines foundational structure (object types, fields, validations) | **Baseline** |
+| Is referenced by many other entities (environments, commands) | **Baseline** |
+| Changes frequently (weekly) as business logic evolves | **Functional** |
+| Can be replaced independently without breaking dependencies | **Functional** |
+| Is specific to a single business process | **Functional** |
+
+**Complete Entity ID Quick Reference:**
+```
+Baseline:  4, 11, 13, 26, 37, 39, 58
+Functional: 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
+```
+
+**See Also:**
+- Complete kMigrator entity reference: `KMIGRATOR_REFERENCE.md`
+- Flag compilation: `tools/config/flags.py`
+- Profile definitions: `config/profiles/*.yaml`
 
 ---
 
@@ -578,35 +900,110 @@ Each promotion updates `target_server` in the BOM for clear audit trail.
 ### **Rollback Strategy (Manual)**
 Rollback is a deliberate CLI action, not part of the automated pipeline.
 
-1.  **Configure the appropriate BOM file:** Set `rollback_pipeline_id` to either:
-    *   A **numeric ID** from a previous GitLab pipeline (e.g., `12345`)
-    *   The keyword **`local`** to use the artifacts from your last local `deploy` run
+**Prerequisites:**
+1. **Valid BOM File:** BOM must pass validation (schema, required fields, entity references)
+2. **Rollback Pipeline ID:** Set `rollback_pipeline_id` in BOM to:
+   - A **numeric ID** from a previous GitLab pipeline (e.g., `12345`)
+   - The keyword **`local`** to use artifacts from your last local `deploy` run
+3. **Approvals:** Same approval requirements as forward deployment (2 for non-prod, 3+ for prod)
+4. **Archive Availability:** Rollback archive must exist in GitLab artifacts or S3 cold storage
 
-2.  **Run the rollback command:**
-    ```bash
-    # For baseline rollback
-    python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
+**Rollback Command:**
+```bash
+# For baseline rollback
+python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
 
-    # For functional rollback
-    python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
-    ```
+# For functional rollback
+python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
+```
 
-The script downloads the archived artifacts (bundles and original flags) and redeploys them to the target server.
+### **Rollback Execution Flow**
 
-### **Archive on Success**
-Every successful deployment creates two artifacts stored in GitLab:
+The rollback process follows these steps in order:
+
+1. **Validate BOM File** (FIRST STEP)
+   - Verify BOM schema and required fields
+   - Check `rollback_pipeline_id` is set and valid
+   - Exit immediately if validation fails
+
+2. **Determine Rollback Source**
+   - If `rollback_pipeline_id = "local"`: Use local archives directory
+   - If numeric pipeline ID: Use three-tier retrieval strategy
+
+3. **Three-Tier Archive Retrieval Strategy**
+
+   **Tier 1: GitLab Artifacts (Primary)**
+   - Download artifacts from specified pipeline ID
+   - Look for `ROLLBACK_MANIFEST.yaml` in artifacts
+   - **Retention:** 1 year (configurable in .gitlab-ci.yml)
+   - **Best for:** Recent deployments (within artifact retention period)
+
+   **Tier 2: S3 Cold Storage (Fallback)**
+   - If GitLab artifacts expired or unavailable, query S3
+   - Use `s3_snapshot_url` from ROLLBACK_MANIFEST metadata
+   - Download complete deployment snapshot from S3
+   - **Retention:** Permanent (lifecycle policy configurable)
+   - **Best for:** Long-term rollback needs (6+ months old)
+
+   **Tier 3: Local Filesystem (Last Resort)**
+   - If both GitLab and S3 unavailable, check local `archives/` directory
+   - **Warning:** Only available if original deployment ran locally
+   - **Best for:** Development/testing environments
+
+4. **Locate Archive ZIP**
+   - Read `ROLLBACK_MANIFEST.yaml` to find `rollback_bundle_path`
+   - Verify archive file exists and is accessible
+
+5. **Validate Target Server**
+   - Compare manifest's `target_server` with BOM's `target_server`
+   - **Safety check:** Prevents cross-environment rollback (e.g., prod archive → test)
+   - Exit with error if mismatch detected
+
+6. **Extract Archive Contents**
+   - Unzip archive to temporary directory
+   - Extract:
+     - `bundles/*.xml` - Entity bundles to redeploy
+     - `bom.yaml` - Original BOM configuration
+     - `flags.txt` - Exact 25-character flag string from original deployment
+     - `manifest.yaml` - Deployment metadata
+
+7. **Import Bundles to Target Server**
+   - Use **original flags** from `flags.txt` (ensures identical deployment behavior)
+   - Redeploy all bundles in same order as original deployment
+   - Use same i18n_mode and refdata_mode settings
+
+8. **Cleanup Temporary Files**
+   - Remove extracted archive contents
+   - Keep ROLLBACK_MANIFEST.yaml for audit trail
+
+### **Archive Structure on Success**
+
+Every successful deployment creates artifacts stored in **both GitLab and S3** (production mode):
 
 **1. Archive ZIP** (`archives/CR-12345-v1.0.0-20251007-archive.zip`)
 
 Contains:
-- `bundles/` - Extracted XML files
-- `bom.yaml` - Original BOM file
-- `flags.txt` - Exact flags used (25-char Y/N string)
+- `bundles/` - Extracted XML entity files
+- `bom.yaml` - Original BOM file used for deployment
+- `flags.txt` - Exact 25-character Y/N flag string used
 - `manifest.yaml` - Deployment metadata (version, timestamp, bundles list)
 
-**2. Rollback Manifest** (`archives/ROLLBACK_MANIFEST.yaml`)
+**2. Evidence Package** (`archives/CR-12345-v1.0.0-20251007-evidence.zip`)
+
+Contains:
+- Archive ZIP (above)
+- BOM file
+- Deployment logs
+- Git metadata (commit SHA, branch, pipeline ID)
+
+**3. Rollback Manifest** (`archives/ROLLBACK_MANIFEST.yaml`)
+
+**Version 2.0.0 Structure:**
 ```yaml
 rollback_bundle_path: archives/CR-12345-v1.0.0-20251007-archive.zip
+s3_snapshot_url: s3://ppm-deployment-snapshots/12345/functional-snapshot.tar.gz
+s3_archive_url: s3://ppm-deployment-snapshots/12345/CR-12345-v1.0.0-20251007-archive.zip
+storage_backend: s3
 deployment_metadata:
   deployment_type: functional
   profile: functional-cd
@@ -617,33 +1014,66 @@ deployment_metadata:
 git_context:
   commit_sha: abc123def456
   pipeline_id: 54321
-manifest_version: "1.0.0"
+  branch: feature/incident-workflow
+manifest_version: "2.0.0"
 created_at: 2025-01-07T14:30:00Z
 ```
 
-Both artifacts stored in GitLab pipeline artifacts (prod: 1 year retention)
+**New in v2.0.0:**
+- `s3_snapshot_url` - Complete deployment snapshot in S3 (bundles + metadata + evidence)
+- `s3_archive_url` - Direct S3 URL to archive ZIP for faster retrieval
+- `storage_backend` - Indicates storage mode used (local or s3)
+
+**Storage Locations:**
+- **GitLab Artifacts:** 1 year retention (faster access for recent deployments)
+- **S3 Cold Storage:** Permanent retention (long-term rollback capability)
+- **Local Filesystem:** Development/testing only
 
 **Purpose:**
-- **Archive ZIP** - Contains bundles and original deployment configuration
-- **ROLLBACK_MANIFEST.yaml** - Points to the archive and provides metadata for validation
+- **Archive ZIP** - Contains bundles and exact deployment configuration for rollback
+- **Evidence Package** - Complete audit trail for compliance and troubleshooting
+- **ROLLBACK_MANIFEST.yaml** - Index file pointing to archive locations (GitLab + S3)
 
-### **Rollback Execution Flow**
+### **Error Scenarios and Troubleshooting**
 
-1. **Configure Rollback:** Set `rollback_pipeline_id` in BOM to previous successful pipeline ID
-2. **Approval:** Get same approvals as forward deployment (2 for non-prod, 3+ for prod)
-3. **Download Artifacts:** Pipeline downloads artifacts from GitLab (includes ROLLBACK_MANIFEST.yaml + archive ZIP)
-4. **Locate Archive:** Read `ROLLBACK_MANIFEST.yaml` to find `rollback_bundle_path`
-5. **Validate Target:** Compare manifest's `target_server` with BOM's `target_server`
-   - **Safety check:** Prevents accidental cross-environment rollback (e.g., prod archive -> test)
-   - Exits with error if mismatch detected
-6. **Extract Archive:** Unzip the archive and read `flags.txt` for original deployment flags
-7. **Import Bundles:** Redeploy all bundles using **original flags** from the archive
-8. **Cleanup:** Remove temporary files
+**BOM Validation Failures:**
+```
+ERROR: BOM validation failed
+- Missing required field: rollback_pipeline_id
+- Invalid target_server: not found in deployment-config.yaml
+```
+**Solution:** Fix BOM file errors before proceeding with rollback
 
-**Key Points:**
-- Rollback uses exact flags from original deployment for consistency
-- Target server validation prevents deploying wrong archive to wrong environment
-- ROLLBACK_MANIFEST.yaml is the "index" that makes rollback fast and safe
+**Archive Not Found (GitLab):**
+```
+WARNING: GitLab artifacts not available for pipeline 12345
+Reason: Artifacts expired (older than 1 year)
+Falling back to S3 cold storage...
+```
+**Solution:** System automatically falls back to S3 if configured
+
+**Archive Not Found (S3):**
+```
+ERROR: S3 snapshot not available
+s3_snapshot_url: s3://ppm-deployment-snapshots/12345/functional-snapshot.tar.gz
+Reason: NoSuchKey
+```
+**Solution:** Check if deployment was run with storage_backend=local or S3 bucket access
+
+**Target Server Mismatch:**
+```
+ERROR: Target server mismatch detected
+BOM target_server: prod-ppm-useast
+Manifest target_server: test-ppm-useast
+SAFETY CHECK: Cannot rollback test archive to production
+```
+**Solution:** Verify you're using correct BOM and rollback_pipeline_id
+
+**Key Rollback Principles:**
+- Rollback uses **exact flags** from original deployment for consistency
+- Three-tier retrieval ensures rollback capability even after GitLab artifact expiration
+- Target server validation prevents accidental cross-environment rollback
+- ROLLBACK_MANIFEST v2.0.0 provides dual-location redundancy (GitLab + S3)
 
 ---
 
