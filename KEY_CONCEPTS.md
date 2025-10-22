@@ -447,7 +447,7 @@ Both artifacts stored in GitLab pipeline artifacts (prod: 1 year retention)
 ### **CODEOWNERS**
 - Baseline BOMs (`boms/baseline.yaml`) -> `@platform-team` required
 - Prod deployments (when `target_server` contains "prod") -> `@tech-leads` + `@ops-team` required
-- Profiles/schemas (`profiles/*.yaml`, `tools/ppm-flag-schema.yaml`) -> `@platform-team` required
+- Profiles/schemas (`profiles/*.yaml`, `profiles/ppm-flag-schema.yaml`) -> `@platform-team` required
 
 ---
 

@@ -51,6 +51,6 @@ archive:
   needs: [extract, import]
   artifacts:
     paths:
-      - archives/*.yaml
-      - evidence/
-    expire_in: 1 year
+      - archives/ROLLBACK_MANIFEST.yaml  # Pointer to S3 archive
+      - evidence/                         # Audit evidence
+    expire_in: never  # Keep manifest permanently for audit trail

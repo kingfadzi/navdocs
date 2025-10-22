@@ -25,7 +25,7 @@
 /profiles/** @platform-team
 
 # Flag schema - immutable, require platform lead
-/tools/ppm-flag-schema.yaml @platform-lead @platform-team
+/profiles/ppm-flag-schema.yaml @platform-lead @platform-team
 
 # Pipeline configuration - require platform team
 /.gitlab-ci.yml @platform-team @ops-team

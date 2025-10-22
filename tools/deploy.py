@@ -523,10 +523,28 @@ def archive_command(bom_file, deployment_type):
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     root = Path(__file__).parent.parent
     config = load_config()
+    storage = get_storage_backend(config)
+    storage_mode = config['deployment'].get('storage_backend', 'local')
+
+    # Step 1: Create archive ZIP locally
     archive_path = archive_deployment(metadata['bundles'], metadata['bom_file'], metadata['flags'], config)
-    create_rollback_manifest(archive_path, metadata, metadata['bom_file'])
+
+    # Step 2: Upload archive to S3 (if S3 mode)
+    if storage_mode == 's3':
+        archive_s3_key = f"archives/{archive_path.name}"
+        print(f"\nUploading archive to S3...")
+        archive_location = storage.upload_file(archive_path, archive_s3_key)
+    else:
+        archive_location = archive_path
+
+    # Step 3: Create ROLLBACK_MANIFEST with archive location
+    create_rollback_manifest(archive_location, storage_mode, metadata, metadata['bom_file'])
+
+    # Step 4: Print rollback info and create evidence
     print_gitlab_artifact_info(archive_path, metadata['bom_file'], metadata)
     create_evidence_package(metadata['bom_file'], archive_path, config)
+
+    # Step 5: Cleanup
     bundle_dir = root / "bundles"
     if bundle_dir.exists():
         shutil.rmtree(bundle_dir)
@@ -535,14 +553,24 @@ def archive_command(bom_file, deployment_type):
     print(f"ARCHIVE COMPLETE for {deployment_type}")
     print("=" * 60)
 
-def create_rollback_manifest(archive_path, metadata, bom_file):
-    """Create ROLLBACK_MANIFEST.yaml inside the archives directory."""
+def create_rollback_manifest(archive_location, storage_mode, metadata, bom_file):
+    """Create ROLLBACK_MANIFEST.yaml with S3 or local path."""
     root = Path(__file__).parent.parent
     archive_dir = root / "archives"
-    archive_dir.mkdir(exist_ok=True) # Ensure the directory exists
+    archive_dir.mkdir(exist_ok=True)
     manifest_path = archive_dir / "ROLLBACK_MANIFEST.yaml"
+
+    # Determine rollback_bundle_path format
+    if isinstance(archive_location, Path):
+        # Local mode - relative path
+        rollback_path = str(archive_location.relative_to(root))
+    else:
+        # S3 mode - full S3 URL
+        rollback_path = archive_location
+
     manifest = {
-        'rollback_bundle_path': str(archive_path.relative_to(root)),
+        'rollback_bundle_path': rollback_path,
+        'storage_backend': storage_mode,
         'deployment_metadata': {
             'deployment_type': metadata.get('deployment_type'),
             'profile': metadata.get('profile'),
@@ -558,9 +586,12 @@ def create_rollback_manifest(archive_path, metadata, bom_file):
         'manifest_version': '1.0.0',
         'created_at': datetime.now().isoformat()
     }
+
     with open(manifest_path, 'w') as f:
         yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
+
     print(f"Created rollback manifest: {manifest_path}")
+    print(f"Archive location: {rollback_path}")
 
 def validate_bom_before_action(bom_file):
     """Helper to run validation and exit on failure."""

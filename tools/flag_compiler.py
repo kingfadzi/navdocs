@@ -98,7 +98,7 @@ def main():
     script_dir = Path(__file__).parent
     root_dir = script_dir.parent
 
-    schema_file = script_dir / "ppm-flag-schema.yaml"
+    schema_file = root_dir / "profiles" / "ppm-flag-schema.yaml"
     profile_file = root_dir / "profiles" / f"{profile_name}.yaml"
 
     # Load files
