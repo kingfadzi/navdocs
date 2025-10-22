@@ -233,22 +233,44 @@ def rollback(bom_file, deployment_type):
             manifest_source = 's3_fallback'
 
     if manifest_source == 's3_fallback':
-        # Fallback to S3
-        s3_archive_url = manifest.get('s3_archive_url') if manifest else None
-        if not s3_archive_url:
-            print("ERROR: No S3 fallback URL available")
-            print("GitLab artifacts have expired and no S3 backup exists.")
-            sys.exit(1)
-
+        # Fallback to S3 - download ROLLBACK_MANIFEST first, then archive
         from storage import get_storage_backend
         storage = get_storage_backend(config)
 
-        # Parse S3 URL: s3://bucket/snapshots/54321/archives/file.zip
-        s3_key = s3_archive_url.replace(f"s3://{config['s3']['bucket_name']}/", "")
-        local_archive = temp_dir / Path(s3_key).name
+        # Download ROLLBACK_MANIFEST.yaml from S3
+        s3_manifest_key = f"snapshots/{rollback_pipeline_id}/archives/ROLLBACK_MANIFEST.yaml"
+        local_manifest_path = temp_dir / "ROLLBACK_MANIFEST.yaml"
 
-        print(f"\nDownloading from S3: {s3_archive_url}")
-        storage.download_file(s3_key, local_archive)
+        print(f"\nDownloading ROLLBACK_MANIFEST from S3...")
+        try:
+            storage.download_file(s3_manifest_key, local_manifest_path)
+            manifest = load_yaml(local_manifest_path)
+            print(f"✓ Found manifest in S3")
+
+            # Validate manifest
+            validate_rollback_manifest(manifest, target_server)
+
+            # Get archive URL from manifest
+            s3_archive_url = manifest.get('s3_archive_url')
+            if not s3_archive_url:
+                print("ERROR: ROLLBACK_MANIFEST in S3 does not contain s3_archive_url")
+                sys.exit(1)
+
+            # Download archive from S3
+            s3_key = s3_archive_url.replace(f"s3://{config['s3']['bucket_name']}/", "")
+            local_archive = temp_dir / Path(s3_key).name
+
+            print(f"\nDownloading archive from S3: {s3_archive_url}")
+            storage.download_file(s3_key, local_archive)
+
+        except Exception as e:
+            print(f"ERROR: Failed to retrieve rollback artifacts from S3: {e}")
+            print(f"Tried: s3://{config['s3']['bucket_name']}/{s3_manifest_key}")
+            print("\nPossible causes:")
+            print("  - S3 snapshot was not created for this pipeline")
+            print("  - Pipeline ID is incorrect")
+            print("  - S3 objects have been deleted")
+            sys.exit(1)
 
     elif manifest_source == 'local':
         # Local mode

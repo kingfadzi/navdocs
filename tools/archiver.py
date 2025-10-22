@@ -168,11 +168,17 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
     shutil.copy(bom_file, snapshot_dir / "bom.yaml")
     print(f"Copied BOM: {Path(bom_file).name}")
 
-    # 6. Job logs are captured by GitLab (accessible via GitLab UI)
+    # 6. Copy ROLLBACK_MANIFEST if it exists (for S3 fallback during rollback)
+    rollback_manifest = root / "archives" / "ROLLBACK_MANIFEST.yaml"
+    if rollback_manifest.exists():
+        shutil.copy(rollback_manifest, archives_dir / "ROLLBACK_MANIFEST.yaml")
+        print(f"Copied ROLLBACK_MANIFEST for S3 fallback")
+
+    # 7. Job logs are captured by GitLab (accessible via GitLab UI)
     # Note: Logs are not included in snapshot - access via GitLab job logs
     print("\nJob logs available in GitLab pipeline history")
 
-    # 7. Create SNAPSHOT_MANIFEST
+    # 8. Create SNAPSHOT_MANIFEST
     snapshot_manifest = {
         'snapshot_version': '1.0.0',
         'created_at': datetime.now().isoformat(),
@@ -181,7 +187,7 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
         'snapshot_contents': {
             'bundles': [f.name for f in bundles_dir.glob('*.xml')],
             'metadata': [f.name for f in bundles_dir.glob('*.yaml')],
-            'archives': [f.name for f in archives_dir.glob('*.zip')],
+            'archives': [f.name for f in archives_dir.glob('*')],  # Includes .zip + ROLLBACK_MANIFEST.yaml
             'evidence': [f.name for f in evidence_dir.glob('*.zip')],
             'bom': 'bom.yaml'
         },
@@ -207,7 +213,7 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
 
     print(f"Created SNAPSHOT_MANIFEST: {manifest_path}")
 
-    # 8. Upload snapshot to S3
+    # 9. Upload snapshot to S3
     storage_mode = config['deployment'].get('storage_backend', 'local')
     s3_snapshot_url = None
 
@@ -234,7 +240,7 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
         print("\nLocal mode: Snapshot created locally (not uploaded to S3)")
         print(f"Snapshot location: {snapshot_dir}")
 
-    # 9. Cleanup
+    # 10. Cleanup
     if storage_mode == 's3':
         shutil.rmtree(snapshot_dir)
         print(f"Cleaned up temporary snapshot directory")
