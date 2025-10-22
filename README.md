@@ -6,27 +6,39 @@ This repository contains a declarative, opinionated configuration system for dep
 
 ```
 .
-- .gitlab/
-  - merge_request_templates/
-- archives/                      # Deployment archives (gitignored)
-- boms/
-  - baseline.yaml                # Baseline deployment configuration
-  - functional.yaml              # Functional deployment configuration
-- config/
-  - deployment-config.yaml       # Infrastructure config (servers, scripts)
-  - rules.yaml                   # Governance rules for validation
-- mock/                          # Mock scripts for local testing
-- profiles/
-  - baseline.yaml                # Profile for foundational entities
-  - functional-cd.yaml           # Profile for business logic
-- templates/
-  - gitlab-ci-template.yml       # Reusable child pipeline for deployment stages
-- tools/
-  - deploy.py                    # Main deployment orchestrator script
-  - flag_compiler.py             # Compiles profile flags to Y/N string
-  - validate_bom.py              # BOM validation script
-- .gitlab-ci.yml                 # Main GitLab CI/CD pipeline orchestrator
-- ...
+├── .gitlab-ci.yml                     # Main pipeline orchestrator
+├── archives/                          # Deployment archives (gitignored)
+├── boms/
+│   ├── baseline.yaml                  # Baseline deployment BOM
+│   └── functional.yaml                # Functional deployment BOM
+├── config/
+│   ├── deployment-config.yaml         # Production server/storage config
+│   ├── deployment-config.local.yaml   # Local overrides (gitignored)
+│   └── rules.yaml                     # Governance rules
+├── profiles/
+│   ├── baseline.yaml                  # Baseline entity profile
+│   └── functional-cd.yaml             # Functional entity profile
+├── templates/
+│   └── child-pipeline-template.yml    # Reusable CI/CD stages
+├── tools/
+│   ├── config/                        # Configuration & validation
+│   │   ├── flags.py                   # Flag compiler
+│   │   ├── validation.py              # BOM validator
+│   │   └── pipeline.py                # Pipeline generator
+│   ├── deployment/                    # Core deployment logic
+│   │   ├── orchestrator.py            # Main deployment orchestrator
+│   │   ├── archive.py                 # Archive & evidence creation
+│   │   ├── rollback.py                # Rollback execution
+│   │   └── utils.py                   # Shared utilities
+│   ├── executors/                     # Execution abstraction
+│   │   ├── local.py                   # Local executor (development)
+│   │   └── ssh.py                     # Remote executor (production)
+│   └── storage/                       # Storage backends
+│       ├── local.py                   # Local filesystem
+│       └── s3.py                      # S3/MinIO storage
+├── KEY_CONCEPTS.md                    # Comprehensive system documentation
+├── KMIGRATOR_REFERENCE.md             # kMigrator script/flag reference
+└── README.md                          # This file
 ```
 
 ## How It Works
@@ -48,16 +60,43 @@ This repository contains a declarative, opinionated configuration system for dep
 
 5.  **Archiving:** Every successful deployment is archived, creating a deployment package and manifest that can be used for manual rollbacks.
 
+6.  **Storage Backends:**
+    - **Local Mode** (development): Bundles stored in `bundles/` and `archives/` directories
+    - **S3 Mode** (production): Bundles uploaded to S3 for permanent retention, downloaded to GitLab artifacts
+
+7.  **Execution Modes:**
+    - **Local Executor**: Direct script execution on local machine (development/testing)
+    - **Remote Executor**: SSH + SCP to remote PPM servers (production)
+
 ## Setup
 
-```bash
-# Install dependencies (one time)
-python3 -m pip install PyYAML --break-system-packages
+### **Production (CI/CD)**
+No setup required - credentials injected automatically by HashiCorp Vault via GitLab CI/CD component.
 
-# Set credentials for local runs
-export PPM_USERNAME=your_username
+### **Local Development**
+
+**1. Install Dependencies:**
+```bash
+python3 -m pip install PyYAML --break-system-packages
+```
+
+**2. Create Local Configuration Override:**
+```bash
+cp config/deployment-config.yaml config/deployment-config.local.yaml
+# Edit deployment-config.local.yaml:
+# - Set ssh_host: null (use local executor)
+# - Set storage_backend: local (skip S3)
+# - Update kmigrator script paths to local paths
+```
+
+**3. Set Environment Variables:**
+```bash
+export DEPLOYMENT_ENV=local          # Enable local mode
+export PPM_USERNAME=your_username    # PPM credentials
 export PPM_PASSWORD=your_password
 ```
+
+**See [KEY_CONCEPTS.md - Local Testing Setup](KEY_CONCEPTS.md#local-testing-setup) for complete configuration guide.**
 
 ## Usage
 
@@ -99,6 +138,10 @@ entities:
     description: "Incident management workflow"
 ```
 
+**Deployment Modes:**
+- **Local Mode** (`DEPLOYMENT_ENV=local`): Uses LocalExecutor + local storage
+- **Production Mode** (CI/CD): Uses RemoteExecutor + S3 storage with Vault credentials
+
 ### **2. Validate Locally (Recommended)**
 
 Before committing, validate your BOM file(s):
@@ -132,28 +175,87 @@ Commit the changes and push your branch. The pipeline will run automatically:
 
 ## Manual Rollback
 
-Rollback is a manual process that can be run against artifacts from GitLab or a previous local deployment.
+Rollback uses a **three-tier retrieval strategy** to restore previous deployments:
 
-1.  **Configure the appropriate BOM file:** Set `rollback_pipeline_id` in the file you want to rollback:
-    *   A **GitLab Pipeline ID** (e.g., `12345`) to restore a version from a specific pipeline
-    *   The keyword **`local`** to restore the version from your last local `deploy` run
+**Retrieval Priority:**
+1. **GitLab Artifacts** (primary) - 1 year retention, fastest access
+2. **S3 Cold Storage** (fallback) - Permanent retention for long-term rollback
+3. **Local Filesystem** (development) - Last resort for local testing
 
-2.  **Run the Rollback Command:**
+### **Rollback Process:**
 
-    ```bash
-    # Set credentials for the PPM server
-    export PPM_USERNAME=your_username
-    export PPM_PASSWORD=your_password
+**1. BOM Validation (First Step)**
+- Rollback validates BOM before proceeding
+- Checks `rollback_pipeline_id` is set and valid
+- Exits immediately if validation fails
 
-    # IF USING A GITLAB ID, also set these variables:
-    export GITLAB_API_TOKEN=your_gitlab_token
-    export CI_PROJECT_ID=your_project_id
-    export CI_API_V4_URL="https://gitlab.company.com/api/v4"
+**2. Configure BOM File**
 
-    # Run the rollback command for the desired deployment type
-    # For baseline rollback:
-    python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
+Set `rollback_pipeline_id` in the BOM file you want to rollback:
+```yaml
+# boms/functional.yaml
+rollback_pipeline_id: 12345  # GitLab pipeline ID
+# OR
+rollback_pipeline_id: local  # Use last local deployment
+```
 
-    # For functional rollback:
-    python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
-    ```
+**3. Run Rollback Command**
+
+```bash
+# Set local mode and credentials
+export DEPLOYMENT_ENV=local
+export PPM_USERNAME=your_username
+export PPM_PASSWORD=your_password
+
+# Baseline rollback
+python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
+
+# Functional rollback
+python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
+```
+
+**Rollback Behavior:**
+- Downloads archive from GitLab artifacts or S3
+- Validates target server matches (prevents cross-environment rollback)
+- Extracts bundles and original flags
+- Redeploys using **exact flags** from original deployment
+
+**See [KEY_CONCEPTS.md - Rollback Strategy](KEY_CONCEPTS.md#rollback-strategy-manual) for detailed execution flow and troubleshooting.**
+
+## Architecture
+
+This deployment system uses:
+
+- **Storage Backends**: Local filesystem (dev) or S3/MinIO (prod) with permanent retention
+- **Execution Modes**: Local executor (direct) or Remote executor (SSH + SCP)
+- **Secrets Management**: HashiCorp Vault via GitLab CI/CD component
+- **Package Structure**: Modular tools package (`tools.deployment`, `tools.config`, `tools.storage`, `tools.executors`)
+
+**For detailed architecture:**
+- [KEY_CONCEPTS.md](KEY_CONCEPTS.md) - Comprehensive system documentation
+- [KMIGRATOR_REFERENCE.md](KMIGRATOR_REFERENCE.md) - kMigrator script and flag reference
+
+## Documentation
+
+### **[KEY_CONCEPTS.md](KEY_CONCEPTS.md)**
+Complete system documentation including:
+- BOM structure and profiles
+- Tool package structure
+- Storage backends (local vs S3)
+- Execution modes (local vs remote)
+- Vault integration and secrets management
+- Entity categories (baseline vs functional)
+- Rollback strategy with three-tier retrieval
+- Local testing setup with step-by-step guide
+- Deployment pipeline flow
+- Governance rules engine
+
+### **[KMIGRATOR_REFERENCE.md](KMIGRATOR_REFERENCE.md)**
+kMigrator technical reference:
+- kMigratorExtract.sh complete parameter reference
+- kMigratorImport.sh complete parameter reference
+- All 25 import flags with baseline vs functional usage
+- Entity ID reference table with categories
+- Flag compilation system explanation
+- Common deployment scenarios
+- Troubleshooting guide
