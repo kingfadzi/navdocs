@@ -1,15 +1,12 @@
-# Baseline Deployment BOM
-# Deploy ALL baseline entities (full sync)
-# Use for: Initial environment setup OR periodic alignment
-
-# Required fields
-version: "1.0.2"
+# Baseline BOM
+# Deploy ALL foundational entities (Object Types, Request Headers, Validations, Commands, Environments)
+version: "1.0.29"
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
-description: "Test baseline deployment dev to test"
-created_by: "fadzi"
+change_request: "CR-12345"
+created_by: "your-name"
+description: "Baseline entity sync for new project setup"
 
-# Optional metadata
-# change_request: "OPS-12345"  # Recommended for prod
-# rollback_artifact: "nexus://..."  # Required for prod
+# Rollback configuration (optional)
+rollback_pipeline_id: 12344

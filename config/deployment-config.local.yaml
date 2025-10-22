@@ -1,0 +1,24 @@
+# Local/Mock Mode Configuration Overrides
+# Usage: export DEPLOYMENT_ENV=local
+# These settings override deployment-config.yaml for local development and testing
+
+# kMigrator mock scripts (local execution)
+kmigrator:
+  extract_script: "./mock/kMigratorExtract.sh"
+  import_script: "./mock/kMigratorImport.sh"
+
+# Local storage backend (no S3, files stay on local runner)
+deployment:
+  storage_backend: "local"
+
+# Servers: Remove SSH configuration (local execution mode)
+# Override all servers to remove ssh_host, forcing local execution
+servers:
+  dev-ppm-useast:
+    ssh_host: null
+  test-ppm-useast:
+    ssh_host: null
+  staging-ppm-useast:
+    ssh_host: null
+  prod-ppm-useast:
+    ssh_host: null

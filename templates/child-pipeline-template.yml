@@ -1,0 +1,56 @@
+# templates/child-pipeline-template.yml
+# This is a template for the dynamically generated child pipeline.
+# Uses !reference to explicitly call vault component before_scripts.
+
+stages:
+  - extract
+  - import
+  - archive
+
+# Base template for common setup (dnf installs, etc.)
+.job_base:
+  image: almalinux:8
+  before_script:
+    - dnf install -y -q git bash openssh-clients sshpass
+    - dnf module reset -y python36
+    - dnf install -y -q python3.11 python3.11-pip python3.11-devel
+    - pip3.11 install PyYAML boto3 --quiet
+    - ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+extract:
+  extends: [.job_base]
+  before_script:
+%%EXTRACT_VAULT_REFS%%
+  stage: extract
+  script:
+    - echo "Executing EXTRACT stage..."
+    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+  artifacts:
+    paths:
+      - bundles/*.yaml
+    expire_in: 1 hour
+
+import:
+  extends: [.job_base]
+  before_script:
+%%IMPORT_VAULT_REFS%%
+  stage: import
+  script:
+    - echo "Executing IMPORT stage..."
+    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+  needs: [extract]
+
+archive:
+  extends: [.job_base]
+  before_script:
+%%ARCHIVE_VAULT_REFS%%
+  stage: archive
+  script:
+    - echo "Executing ARCHIVE stage..."
+    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+  needs: [extract, import]
+  artifacts:
+    paths:
+      - archives/*.yaml
+      - evidence/
+    expire_in: 1 year

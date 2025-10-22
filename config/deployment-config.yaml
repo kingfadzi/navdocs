@@ -1,44 +1,72 @@
-# Deployment Configuration
+# Production Deployment Configuration
+# This is the default configuration used in production CI/CD pipelines
+# For local testing, create deployment-config.local.yaml to override these settings
 
-# kMigrator script paths
-# Point to mock scripts for testing, or real PPM installation scripts for production
+# kMigrator real installation paths (remote execution on PPM servers)
 kmigrator:
-  extract_script: "./mock/kMigratorExtract.sh"
-  import_script: "./mock/kMigratorImport.sh"
-
-  # For production, use real PPM paths:
-  # extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
-  # import_script: "/opt/ppm/bin/kMigratorImport.sh"
+  extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
+  import_script: "/opt/ppm/bin/kMigratorImport.sh"
 
 # Deployment settings
 deployment:
   bundle_dir: "./bundles"
   archive_dir: "./archives"
+  storage_backend: "s3"  # S3 storage (bundles go directly: PPM → S3 → PPM)
 
-# Nexus artifact repository (for rollback archives)
-nexus:
-  url: "http://localhost:8081"  # Mock Nexus server
-  repository: "ppm-deployments"
-  subfolder: "2025"  # Organize by year
-  # Credentials from environment variables: NEXUS_USERNAME, NEXUS_PASSWORD or NEXUS_TOKEN
+# S3/MinIO configuration
+s3:
+  bucket_name: "ppm-deployment-bundles"
+  region: "us-east-1"
+  prefix: "bundles/"
+  endpoint_url: "http://phobos:9002"
+  # Credentials from Vault
+  vault_roles:
+    - name: s3-read
+      path: secret/data/shared/s3
 
-# PPM Server Registry
-# Format: {env_type}-ppm-{region}
+# PPM Server Registry with SSH configuration for remote execution
+# Credentials injected from GitLab CI/CD environment variables (via Vault):
+#
+# Environment-specific (vault: secret/data/ppm/{env}/useast):
+#   - PPM_SERVICE_ACCOUNT_USER: Service account username (used for both PPM API and SSH)
+#   - PPM_SERVICE_ACCOUNT_PASSWORD: Service account password (used for both PPM API and SSH)
+#
+# Shared across all environments (vault: secret/data/shared/s3):
+#   - AWS_ACCESS_KEY_ID: S3/MinIO access key
+#   - AWS_SECRET_ACCESS_KEY: S3/MinIO secret key
 servers:
   dev-ppm-useast:
     url: "https://ppm-dev.company.com"
     env_type: dev
-    credential_path: "/secrets/ppm-dev"
     region: useast
+    ssh_host: "mars"
+    vault_roles:
+      - name: ppm-dev
+        path: secret/data/ppm/dev/useast
 
   test-ppm-useast:
     url: "https://ppm-test.company.com"
     env_type: test
-    credential_path: "/secrets/ppm-test"
     region: useast
+    ssh_host: "phobos"
+    vault_roles:
+      - name: ppm-test
+        path: secret/data/ppm/test/useast
+
+  staging-ppm-useast:
+    url: "https://ppm-staging.company.com"
+    env_type: staging
+    region: useast
+    ssh_host: "cygnus"
+    vault_roles:
+      - name: ppm-staging
+        path: secret/data/ppm/staging/useast
 
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
     env_type: prod
-    credential_path: "/secrets/ppm-prod"
     region: useast
+    ssh_host: "helios"
+    vault_roles:
+      - name: ppm-prod
+        path: secret/data/ppm/prod/useast

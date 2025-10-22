@@ -1,27 +1,21 @@
-# Functional Release BOM
-# Deploy SPECIFIC functional entities
-# Use for: Sprint releases, feature deployments, bug fixes
-
-# Required fields
-version: "1.0.4"
-change_request: "CR-12345"
+# Functional BOM
+# Deploy SPECIFIC business logic entities (Workflows, Request Types, Reports, Dashboards)
+version: "2.0.31"
 profile: functional-cd
-source_server: test-ppm-useast
-target_server: prod-ppm-useast
-description: "Production deployment - workflow release"
-created_by: "fadzi"
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
+change_request: "CR-12345"
+created_by: "your-name"
+description: "Deploy new incident management workflow"
 
-# Required: Specific entities to deploy
+# Rollback configuration (optional)
+rollback_pipeline_id: 12344
+
+# Entities to deploy
 entities:
   - entity_id: 9
-    reference_code: "EXAMPLE_WORKFLOW"
+    reference_code: "WF_INCIDENT_MGMT"
     entity_type: "Workflow"
-    description: "Example workflow production release"
+    description: "Incident management workflow"
 
-# Rollback to previous version (required for prod)
-rollback_artifact: "nexus://ppm-deployments/2025/CR-12300-v1.0.0-20251007-120000-bundles.zip"
-
-# Optional metadata
-# jira_ticket: "PROJ-1234"
-# approved_by: ["jane.smith", "john.doe"]
-# deployment_window: "2025-10-08T02:00:00Z"
+# Triggering pipeline for test

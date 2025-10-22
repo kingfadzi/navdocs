@@ -8,35 +8,21 @@ version: "1.0.0"
 # CRITICAL RULES (Day 1)
 # ==============================================================================
 
-# Prevent invalid deployment flow
-prohibited_deployment_paths:
+# Enforce sequential deployment promotion order
+deployment_promotion_order:
   enabled: true
   severity: blocking
-  paths:
-    # Reverse flow - prevents data leaks from higher to lower environments
-    - source: prod
-      target: [dev, test, uat, staging]
-      reason: "Cannot copy production data to lower environments"
+  # Define promotion sequence - strict sequential promotion enforced (no skipping)
+  # Current environments: dev -> test -> staging -> prod
+  sequence: [dev, test, staging, prod]
+  message: "Deployments must follow strict promotion order: dev → test → staging → prod (no skipping)"
 
-    - source: staging
-      target: [dev, test, uat]
-      reason: "Cannot copy staging data to lower environments"
-
-    # Lateral flow - prevents backwards/sideways deployment
-    - source: test
-      target: [dev]
-      reason: "Cannot reverse deployment flow"
-
-    - source: uat
-      target: [dev]
-      reason: "Cannot reverse deployment flow"
-
-# Production deployments require rollback capability
+# All deployments require rollback capability
 require_prod_rollback:
   enabled: true
-  applies_to: [prod, staging]
+  applies_to: [dev, test, uat, staging, prod]
   severity: blocking
-  message: "Production deployments must specify rollback_artifact"
+  message: "All deployments must specify rollback_pipeline_id (enables recovery from mistakes)"
 
 # Production deployments require change request
 require_prod_change_request:
@@ -51,12 +37,6 @@ prevent_same_server:
   severity: blocking
   message: "Source and target servers must be different"
 
-# Functional BOMs must have entities
-require_entities_functional:
-  enabled: true
-  severity: blocking
-  message: "Functional deployments must specify entities[]"
-
 # Branch-environment alignment
 # Ensures BOM target_server matches the branch deployment environment
 require_branch_environment_match:
@@ -64,23 +44,17 @@ require_branch_environment_match:
   severity: blocking
   message: "BOM target_server does not match branch environment"
   mappings:
-    # feature/* branches can only deploy to dev
+    # feature/* branches deploy FROM dev TO test
     feature:
-      allowed_env_types: [dev]
-
-    # develop branch can only deploy to test
-    develop:
       allowed_env_types: [test]
 
-    # main branch can only deploy to prod (and staging if exists)
-    main:
-      allowed_env_types: [prod, staging]
+    # develop branch deploys FROM test TO staging
+    develop:
+      allowed_env_types: [staging]
 
-# Prevent multiple BOM changes in single commit (fail fast)
-prevent_multiple_bom_changes:
-  enabled: true
-  severity: blocking
-  message: "Cannot update both baseline.yaml and functional.yaml in the same commit"
+    # main branch deploys FROM staging TO prod
+    main:
+      allowed_env_types: [prod]
 
 # ==============================================================================
 # FUTURE RULES (Disabled by default - enable when ready)
@@ -92,18 +66,3 @@ max_entities_per_deployment:
   limit: 50
   severity: warning
   message: "Large deployments are harder to troubleshoot. Consider splitting."
-
-# Deployment windows for prod
-enforce_deployment_windows:
-  enabled: false
-  applies_to: [prod]
-  allowed_days: [saturday, sunday]
-  allowed_hours: [0, 1, 2, 3, 4, 5]
-  severity: blocking
-  message: "Production deployments only allowed during maintenance windows"
-
-# Require baseline before functional
-require_baseline_first:
-  enabled: false
-  severity: warning
-  message: "Deploy baseline entities before functional deployments"

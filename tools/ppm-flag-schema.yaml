@@ -72,6 +72,7 @@ flag_schema:
   - position: 16
     key: replace_module
     description: "Replace existing Module"
+    note: "Required when Flag 22 (replace_portfolio_type) is enabled"
 
   - position: 17
     key: replace_data_source
@@ -96,6 +97,7 @@ flag_schema:
   - position: 22
     key: replace_portfolio_type
     description: "Replace existing Portfolio Type"
+    note: "When enabled, Flag 16 (replace_module) must also be enabled"
 
   - position: 23
     key: replace_ppm_integration_sdk
@@ -103,8 +105,10 @@ flag_schema:
 
   - position: 24
     key: replace_custom_menu
-    description: "Replace existing Custom Menu (always replaced regardless)"
+    description: "Replace existing Custom Menu"
+    note: "This flag is IGNORED - menu is always replaced regardless of Y/N value"
 
   - position: 25
     key: replace_chatbot_intents
     description: "Replace existing Chatbot intents (25.2+)"
+    note: "When enabled, Flag 7 (replace_report_type) must also be enabled"
