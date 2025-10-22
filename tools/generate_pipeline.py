@@ -13,7 +13,7 @@ def load_yaml(file_path):
 def generate_vault_references(vault_configs):
     """
     Generate !reference directives for vault component before_scripts.
-    Exports required variables before each vault component call.
+    Component inputs already contain role and paths, so we just reference the anchors.
 
     Args:
         vault_configs: List of tuples (role, path, anchor_name)
@@ -21,15 +21,12 @@ def generate_vault_references(vault_configs):
                              ('s3-read', 'secret/data/shared/s3', 'vault-s3')]
 
     Returns:
-        YAML-formatted string with variable exports and !reference directives
+        YAML-formatted string with !reference directives
     """
     refs = ["    - !reference [.job_base, before_script]"]
 
     for role, path, anchor in vault_configs:
-        # Export variables required by vault component
-        refs.append(f"    - export VAULT_ROLE={role}")
-        refs.append(f"    - export VAULT_SECRET_PATHS='[\"{path}\"]'")
-        # Call the vault component's before_script
+        # Call the vault component's before_script (it already has role/path from inputs)
         refs.append(f"    - !reference [.{anchor}, before_script]")
 
     return "\n".join(refs)
