@@ -62,17 +62,17 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     # --- Step 2: Generate Vault Component Includes ---
     vault_includes = f"""# Vault component includes for dynamic child pipeline
 include:
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.2
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
     inputs:
       anchor_name: 'vault-{source_role}'
       vault_role: '{source_role}'
       vault_secret_paths: '["{source_path}"]'
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.2
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
     inputs:
       anchor_name: 'vault-{target_role}'
       vault_role: '{target_role}'
       vault_secret_paths: '["{target_path}"]'
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.2
+  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
     inputs:
       anchor_name: 'vault-s3'
       vault_role: '{s3_role}'
