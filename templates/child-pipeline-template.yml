@@ -24,7 +24,7 @@ extract:
   stage: extract
   script:
     - echo "Executing EXTRACT stage..."
-    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+    - python3 -m tools.deployment.orchestrator extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
       - bundles/*.xml              # Entity bundles
@@ -38,7 +38,7 @@ import:
   stage: import
   script:
     - echo "Executing IMPORT stage..."
-    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+    - python3 -m tools.deployment.orchestrator import --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract]
 
 archive:
@@ -48,7 +48,7 @@ archive:
   stage: archive
   script:
     - echo "Executing ARCHIVE stage..."
-    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+    - python3 -m tools.deployment.orchestrator archive --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   needs: [extract, import]
   artifacts:
     paths:

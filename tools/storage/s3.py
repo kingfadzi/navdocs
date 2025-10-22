@@ -1,80 +1,16 @@
 #!/usr/bin/env python3
 """
-Storage backend abstraction for PPM deployment bundles.
-Supports local storage (mock mode) and S3/MinIO (production mode).
+S3/MinIO storage backend for production mode.
 """
 
 import os
 import sys
 from pathlib import Path
-from datetime import datetime
 
-
-class StorageBackend:
-    """Base interface for storage backends."""
-
-    def upload_from_server(self, ssh_executor, ssh_config, remote_path, storage_key):
-        """Upload bundle from remote server to storage."""
-        raise NotImplementedError
-
-    def download_to_server(self, ssh_executor, ssh_config, storage_key, remote_path):
-        """Download bundle from storage to remote server."""
-        raise NotImplementedError
-
-    def get_metadata(self, storage_key):
-        """Get metadata about stored bundle."""
-        raise NotImplementedError
-
-    def upload_file(self, local_path, storage_key):
-        """Upload local file to storage (for archives)."""
-        raise NotImplementedError
-
-    def download_file(self, storage_key, local_path):
-        """Download file from storage to local path (for rollback)."""
-        raise NotImplementedError
-
-
-class LocalStorage(StorageBackend):
-    """Local storage backend for mock/development mode."""
-
-    def __init__(self, config):
-        self.bundle_dir = Path(config.get('bundle_dir', './bundles'))
-
-    def upload_from_server(self, ssh_executor, ssh_config, remote_path, storage_key):
-        """No-op for local mode - files are already local."""
-        local_path = self.bundle_dir / Path(remote_path).name
-        return {
-            'storage_mode': 'local',
-            'local_path': str(local_path),
-            'bundle_filename': Path(remote_path).name
-        }
-
-    def download_to_server(self, ssh_executor, ssh_config, storage_key, remote_path):
-        """No-op for local mode - files are already local."""
-        return True
-
-    def get_metadata(self, storage_key):
-        """Get local file metadata."""
-        if isinstance(storage_key, dict):
-            local_path = storage_key.get('local_path')
-        else:
-            local_path = storage_key
-
-        if Path(local_path).exists():
-            return {
-                'storage_mode': 'local',
-                'local_path': local_path,
-                'exists': True
-            }
-        return {'exists': False}
-
-    def upload_file(self, local_path, storage_key):
-        """No-op for local mode - file already exists locally."""
-        return str(local_path)
-
-    def download_file(self, storage_key, local_path):
-        """No-op for local mode - file already exists locally."""
-        return str(storage_key)
+try:
+    from .base import StorageBackend
+except ImportError:
+    from tools.storage.base import StorageBackend
 
 
 class S3Storage(StorageBackend):
@@ -243,16 +179,3 @@ class S3Storage(StorageBackend):
         except Exception as e:
             print(f"ERROR: S3 download failed: {e}")
             sys.exit(1)
-
-
-def get_storage_backend(config):
-    """Factory function to get appropriate storage backend."""
-    storage_mode = config['deployment'].get('storage_backend', 'local')
-
-    if storage_mode == 'local':
-        return LocalStorage(config['deployment'])
-    elif storage_mode == 's3':
-        return S3Storage(config.get('s3', {}))
-    else:
-        print(f"ERROR: Unknown storage backend: {storage_mode}")
-        sys.exit(1)

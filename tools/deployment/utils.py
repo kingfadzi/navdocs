@@ -11,9 +11,9 @@ from pathlib import Path
 
 # Import validate_bom - handle both direct execution and package import
 try:
-    from validate_bom import validate_bom
+    from config.validation import validate_bom
 except ImportError:
-    from tools.validate_bom import validate_bom
+    from tools.config.validation import validate_bom
 
 
 def load_yaml(file_path):
@@ -41,7 +41,7 @@ def load_config():
     - Default: deployment-config.yaml (production mode)
     - DEPLOYMENT_ENV=local: merges deployment-config.local.yaml overrides
     """
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     base_path = root / "config" / "deployment-config.yaml"
     base_config = load_yaml(base_path)
 

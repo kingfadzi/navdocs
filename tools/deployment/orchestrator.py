@@ -11,20 +11,38 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Import from new modules
-from deploy_utils import (
-    load_yaml, load_config,
-    save_deployment_metadata, load_deployment_metadata,
-    get_flag_string, validate_bom_before_action,
-    get_vault_config_command, apply_default_credentials
-)
-from archiver import (
-    archive_deployment, create_evidence_package,
-    create_complete_snapshot, create_rollback_manifest,
-    print_gitlab_artifact_info
-)
-from executors import get_executor
-import rollback
+# Import from deployment package modules
+try:
+    from deployment.utils import (
+        load_yaml, load_config,
+        save_deployment_metadata, load_deployment_metadata,
+        get_flag_string, validate_bom_before_action,
+        get_vault_config_command, apply_default_credentials
+    )
+    from deployment.archive import (
+        archive_deployment, create_evidence_package,
+        create_complete_snapshot, create_rollback_manifest,
+        print_gitlab_artifact_info
+    )
+    from deployment import rollback
+except ImportError:
+    from tools.deployment.utils import (
+        load_yaml, load_config,
+        save_deployment_metadata, load_deployment_metadata,
+        get_flag_string, validate_bom_before_action,
+        get_vault_config_command, apply_default_credentials
+    )
+    from tools.deployment.archive import (
+        archive_deployment, create_evidence_package,
+        create_complete_snapshot, create_rollback_manifest,
+        print_gitlab_artifact_info
+    )
+    from tools.deployment import rollback
+
+try:
+    from executors import get_executor
+except ImportError:
+    from tools.executors import get_executor
 
 
 def extract_command(bom_file, deployment_type):
@@ -32,7 +50,7 @@ def extract_command(bom_file, deployment_type):
     print("=" * 60)
     print(f"PHASE 1: EXTRACT ({deployment_type.upper()})")
     print("=" * 60)
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
     source_server = bom['source_server']
@@ -161,7 +179,7 @@ def archive_command(bom_file, deployment_type):
     print("=" * 60)
 
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     config = load_config()
     storage_mode = config['deployment'].get('storage_backend', 'local')
     pipeline_id = os.environ.get('CI_PIPELINE_ID', 'local')

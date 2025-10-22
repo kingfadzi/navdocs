@@ -7,13 +7,17 @@ Executor factory and package exports.
 try:
     from executors.local import LocalExecutor
     from executors.remote import RemoteKMigratorExecutor
-    from storage import get_storage_backend
-    from remote_executor import RemoteExecutor
+    from executors.ssh import RemoteExecutor
 except ImportError:
     from tools.executors.local import LocalExecutor
     from tools.executors.remote import RemoteKMigratorExecutor
+    from tools.executors.ssh import RemoteExecutor
+
+# Import storage backend factory
+try:
+    from storage import get_storage_backend
+except ImportError:
     from tools.storage import get_storage_backend
-    from tools.remote_executor import RemoteExecutor
 
 
 def is_remote_mode(server_config, config):

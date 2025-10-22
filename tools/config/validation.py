@@ -26,7 +26,7 @@ def load_yaml(file_path):
 
 def load_config():
     """Load deployment config and handle errors."""
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     config_file = root / 'config' / 'deployment-config.yaml'
     config, err = load_yaml(config_file)
     if err:
@@ -37,7 +37,7 @@ def load_config():
 
 def load_rules():
     """Load governance rules and handle errors."""
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     rules_file = root / 'config' / 'rules.yaml'
     if not rules_file.exists():
         return {}  # No rules file is a valid state
@@ -142,7 +142,7 @@ def validate_bom(bom_file, branch_name=None):
 
     # Check if profile file exists
     if 'profile' in bom:
-        root = Path(__file__).parent.parent
+        root = Path(__file__).parent.parent.parent
         profile_path = root / 'profiles' / f"{bom['profile']}.yaml"
         if not profile_path.exists():
             errors.append(f"Profile not found: {bom['profile']} (expected: {profile_path})")

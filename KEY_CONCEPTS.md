@@ -233,7 +233,7 @@ The system includes an automated rules engine that validates all BOM files befor
 1. **Before deployment:** `validate_bom.py` runs automatically in the validate stage
 2. **Blocking behavior:** If any rule fails, deployment stops before extraction
 3. **Clear errors:** Validation shows exactly which rule failed and why
-4. **Local testing:** Run `python3 tools/validate_bom.py --file boms/baseline.yaml --branch feature/test` before committing
+4. **Local testing:** Run `python3 -m tools.config.validation --file boms/baseline.yaml --branch feature/test` before committing
 
 ### **Future Rules (Disabled - Enable When Ready)**
 
@@ -369,10 +369,10 @@ Rollback is a deliberate CLI action, not part of the automated pipeline.
 2.  **Run the rollback command:**
     ```bash
     # For baseline rollback
-    python3 tools/deploy.py rollback --type baseline --bom boms/baseline.yaml
+    python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
 
     # For functional rollback
-    python3 tools/deploy.py rollback --type functional --bom boms/functional.yaml
+    python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
     ```
 
 The script downloads the archived artifacts (bundles and original flags) and redeploys them to the target server.

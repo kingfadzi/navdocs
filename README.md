@@ -105,10 +105,10 @@ Before committing, validate your BOM file(s):
 
 ```bash
 # Validate baseline BOM
-python3 tools/validate_bom.py --file boms/baseline.yaml --branch <your-branch-name>
+python3 -m tools.config.validation --file boms/baseline.yaml --branch <your-branch-name>
 
 # Validate functional BOM
-python3 tools/validate_bom.py --file boms/functional.yaml --branch <your-branch-name>
+python3 -m tools.config.validation --file boms/functional.yaml --branch <your-branch-name>
 ```
 
 ### **3. Run a Full Deployment Locally (Optional)**
@@ -117,10 +117,10 @@ For local testing, use the `deploy` command to run the entire `extract → impor
 
 ```bash
 # Run a full baseline deployment
-python3 tools/deploy.py deploy --type baseline --bom boms/baseline.yaml
+python3 -m tools.deployment.orchestrator deploy --type baseline --bom boms/baseline.yaml
 
 # Run a full functional deployment
-python3 tools/deploy.py deploy --type functional --bom boms/functional.yaml
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
 ```
 
 ### **4. Create a Merge Request**
@@ -152,8 +152,8 @@ Rollback is a manual process that can be run against artifacts from GitLab or a 
 
     # Run the rollback command for the desired deployment type
     # For baseline rollback:
-    python3 tools/deploy.py rollback --type baseline --bom boms/baseline.yaml
+    python3 -m tools.deployment.orchestrator rollback --type baseline --bom boms/baseline.yaml
 
     # For functional rollback:
-    python3 tools/deploy.py rollback --type functional --bom boms/functional.yaml
+    python3 -m tools.deployment.orchestrator rollback --type functional --bom boms/functional.yaml
     ```

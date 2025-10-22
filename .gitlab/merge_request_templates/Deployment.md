@@ -19,7 +19,7 @@
 ## Checklist
 
 ### Pre-Deployment
-- [ ] BOM validated locally (`python3 tools/validate_bom.py --file boms/...`)
+- [ ] BOM validated locally (`python3 -m tools.config.validation --file boms/...`)
 - [ ] BOM tested in lower environment (dev for test, test for prod)
 - [ ] Required approvals obtained (2 for non-prod, 3+ for prod)
 - [ ] For baseline: Platform team notified

@@ -230,7 +230,7 @@ extract:
     - dnf install -y -q git bash openssh-clients sshpass
     - # Your existing setup without Vault config generation
   script:
-    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+    - python3 -m tools.deployment.orchestrator extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
 ```
 
 **Pattern B: Dynamic Role Selection with Rules**
@@ -245,7 +245,7 @@ extract:dev:
     - .vault-s3
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   rules:
     - if: '$SOURCE_ENV == "dev"'
 
@@ -255,7 +255,7 @@ extract:test:
     - .vault-s3
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   rules:
     - if: '$SOURCE_ENV == "test"'
 
@@ -265,7 +265,7 @@ extract:prod:
     - .vault-s3
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   rules:
     - if: '$SOURCE_ENV == "prod"'
 ```
@@ -283,7 +283,7 @@ Create reusable templates:
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
     - pip3.11 install PyYAML boto3 --quiet
   script:
-    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
+    - python3 -m tools.deployment.orchestrator extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
       - bundles/*.yaml
@@ -331,7 +331,7 @@ If you had a Python script generating `VAULT_CONFIGS`, you have two options:
 generate-pipeline:
   stage: .pre
   script:
-    - python3 tools/generate_pipeline.py $BOM_FILE > child-pipeline.yml
+    - python3 -m tools.config.pipeline $BOM_FILE > child-pipeline.yml
     - cat child-pipeline.yml
   artifacts:
     paths:
@@ -479,7 +479,7 @@ extract:
     - .vault-s3         # S3 for file operations
   stage: extract
   script:
-    - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE
+    - python3 -m tools.deployment.orchestrator extract --type $DEPLOYMENT_TYPE
   artifacts:
     paths:
       - bundles/*.yaml
@@ -495,7 +495,7 @@ import:
     - .vault-s3
   stage: import
   script:
-    - python3 tools/deploy.py import --type $DEPLOYMENT_TYPE
+    - python3 -m tools.deployment.orchestrator import --type $DEPLOYMENT_TYPE
   needs: [extract]
   rules:
     - if: '$TARGET_ENV == "test"'
@@ -508,7 +508,7 @@ archive:
     - .vault-s3
   stage: archive
   script:
-    - python3 tools/deploy.py archive --type $DEPLOYMENT_TYPE
+    - python3 -m tools.deployment.orchestrator archive --type $DEPLOYMENT_TYPE
   needs: [extract, import]
   artifacts:
     paths:
@@ -532,7 +532,7 @@ extract:from-dev:
     - .vault-s3
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   artifacts:
     paths:
       - bundles/*.yaml
@@ -547,7 +547,7 @@ extract:from-test:
     - .vault-s3
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   artifacts:
     paths:
       - bundles/*.yaml
@@ -563,7 +563,7 @@ import:to-dev:
     - .vault-s3
   stage: import
   script:
-    - python3 tools/deploy.py import
+    - python3 -m tools.deployment.orchestrator import
   needs:
     - job: extract:from-dev
       optional: true
@@ -579,7 +579,7 @@ import:to-test:
     - .vault-s3
   stage: import
   script:
-    - python3 tools/deploy.py import
+    - python3 -m tools.deployment.orchestrator import
   needs:
     - job: extract:from-dev
       optional: true
@@ -623,7 +623,7 @@ extract:
     - .vault-ppm-dev  # You still need to match this to SOURCE_ROLE
   stage: extract
   script:
-    - python3 tools/deploy.py extract
+    - python3 -m tools.deployment.orchestrator extract
   needs: [determine:roles]
   rules:
     - if: '$SOURCE_ROLE == "ppm-dev"'
@@ -664,7 +664,7 @@ def generate_pipeline(bom_file):
                 '.vault-s3'
             ],
             'stage': 'extract',
-            'script': ['python3 tools/deploy.py extract'],
+            'script': ['python3 -m tools.deployment.orchestrator extract'],
             'artifacts': {
                 'paths': ['bundles/*.yaml'],
                 'expire_in': '1 hour'
@@ -677,7 +677,7 @@ def generate_pipeline(bom_file):
                 '.vault-s3'
             ],
             'stage': 'import',
-            'script': ['python3 tools/deploy.py import'],
+            'script': ['python3 -m tools.deployment.orchestrator import'],
             'needs': ['extract']
         },
         'archive': {
@@ -687,7 +687,7 @@ def generate_pipeline(bom_file):
                 '.vault-s3'
             ],
             'stage': 'archive',
-            'script': ['python3 tools/deploy.py archive'],
+            'script': ['python3 -m tools.deployment.orchestrator archive'],
             'needs': ['extract', 'import'],
             'artifacts': {
                 'paths': ['archives/*.yaml', 'evidence/'],

@@ -9,12 +9,15 @@ from datetime import datetime
 # Import utilities - handle both direct execution and package import
 try:
     from executors.base import BaseExecutor
-    from deploy_utils import get_credentials
-    from remote_executor import RemoteExecutor
+    from executors.ssh import RemoteExecutor
 except ImportError:
     from tools.executors.base import BaseExecutor
-    from tools.deploy_utils import get_credentials
-    from tools.remote_executor import RemoteExecutor
+    from tools.executors.ssh import RemoteExecutor
+
+try:
+    from deployment.utils import get_credentials
+except ImportError:
+    from tools.deployment.utils import get_credentials
 
 
 class RemoteKMigratorExecutor(BaseExecutor):

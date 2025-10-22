@@ -13,9 +13,14 @@ import zipfile
 import shutil
 import json
 
-from deploy_utils import load_yaml, load_config, apply_default_credentials
-from validate_bom import validate_bom
-from executors import get_executor
+try:
+    from deployment.utils import load_yaml, load_config, apply_default_credentials
+    from config.validation import validate_bom
+    from executors import get_executor
+except ImportError:
+    from tools.deployment.utils import load_yaml, load_config, apply_default_credentials
+    from tools.config.validation import validate_bom
+    from tools.executors import get_executor
 
 def get_bom_section(bom_file, deployment_type):
     """Load the full BOM and return it as the section (BOMs are flat, not nested)."""
@@ -144,7 +149,7 @@ def rollback(bom_file, deployment_type):
     print("=" * 60)
     print()
 
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     bom_section, full_bom = get_bom_section(bom_file, deployment_type)
     target_server = full_bom.get('target_server')
     rollback_pipeline_id = bom_section.get('rollback_pipeline_id')
