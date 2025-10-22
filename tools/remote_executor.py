@@ -71,6 +71,35 @@ class RemoteExecutor:
             remote_command
         ]
 
+    def scp_download(self, ssh_config, remote_path, local_path):
+        """Download file from remote server via SCP."""
+        ssh_host = ssh_config['ssh_host']
+        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+        ssh_password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+        ssh_port = ssh_config.get('ssh_port', 22)
+
+        if not ssh_user or not ssh_password:
+            raise ValueError("SSH credentials not found: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD required")
+
+        env = os.environ.copy()
+        env['SSHPASS'] = ssh_password
+
+        scp_cmd = [
+            'sshpass', '-e',
+            'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-P', str(ssh_port),
+            f'{ssh_user}@{ssh_host}:{remote_path}',
+            local_path
+        ]
+
+        result = subprocess.run(scp_cmd, env=env, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"SCP download failed (exit {result.returncode}): {result.stderr}")
+
+        return result.stdout
+
 
 def create_remote_executor():
     """Factory function to create RemoteExecutor instance."""

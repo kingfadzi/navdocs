@@ -99,42 +99,44 @@ class S3Storage(StorageBackend):
         return self._client
 
     def upload_from_server(self, ssh_executor, ssh_config, remote_path, storage_key):
-        """Upload bundle from remote server to S3/MinIO."""
-        env = os.environ.copy()
-        s3_url = f"s3://{self.bucket}/{storage_key}"
+        """
+        Upload bundle from remote server to S3 by first downloading it to the runner.
+        """
+        s3_client = self._get_client()
+        local_temp_dir = Path('./temp_bundles')
+        local_temp_dir.mkdir(exist_ok=True)
+        local_path = local_temp_dir / Path(remote_path).name
 
-        aws_cmd = (
-            f"AWS_ACCESS_KEY_ID={os.environ['AWS_ACCESS_KEY_ID']} "
-            f"AWS_SECRET_ACCESS_KEY={os.environ['AWS_SECRET_ACCESS_KEY']} "
-        )
-
-        if self.endpoint_url:
-            aws_cmd += f"AWS_ENDPOINT_URL={self.endpoint_url} "
-
-        aws_cmd += f"aws s3 cp {remote_path} {s3_url} --region {self.region}"
-
-        print(f"Uploading to S3: {s3_url}")
-
+        # Step 1: Download the file from the remote server to the local runner
+        print(f"Downloading {remote_path} from remote server...")
         try:
-            stdout, stderr, returncode = ssh_executor.ssh_exec(ssh_config, aws_cmd, env)
+            ssh_executor.scp_download(ssh_config, remote_path, str(local_path))
+            print(f"✓ Downloaded to: {local_path}")
+        except Exception as e:
+            print(f"ERROR: Failed to download bundle from remote server: {e}")
+            sys.exit(1)
 
-            if returncode != 0:
-                print(f"ERROR: S3 upload failed: {stderr}")
-                sys.exit(1)
-
+        # Step 2: Upload the local file to S3 using boto3
+        s3_url = f"s3://{self.bucket}/{storage_key}"
+        print(f"Uploading to S3: {s3_url}")
+        try:
+            s3_client.upload_file(str(local_path), self.bucket, storage_key)
             print(f"✓ Uploaded: {s3_url}\n")
-
-            return {
-                'storage_mode': 's3',
-                's3_bucket': self.bucket,
-                's3_key': storage_key,
-                'bundle_filename': Path(remote_path).name,
-                's3_url': s3_url
-            }
-
         except Exception as e:
             print(f"ERROR: S3 upload failed: {e}")
             sys.exit(1)
+        finally:
+            # Clean up the local temporary file
+            if os.path.exists(local_path):
+                os.remove(local_path)
+
+        return {
+            'storage_mode': 's3',
+            's3_bucket': self.bucket,
+            's3_key': storage_key,
+            'bundle_filename': Path(remote_path).name,
+            's3_url': s3_url
+        }
 
     def download_to_server(self, ssh_executor, ssh_config, bundle_metadata, remote_path):
         """Download bundle from S3/MinIO to remote server."""
