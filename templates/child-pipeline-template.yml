@@ -27,8 +27,9 @@ extract:
     - python3 tools/deploy.py extract --type $DEPLOYMENT_TYPE --bom $BOM_FILE
   artifacts:
     paths:
-      - bundles/*.yaml
-    expire_in: 1 hour
+      - bundles/*.xml              # Entity bundles
+      - bundles/*.yaml             # Metadata
+    expire_in: 1 week              # Keep for operational use
 
 import:
   extends: [.job_base]
@@ -51,6 +52,7 @@ archive:
   needs: [extract, import]
   artifacts:
     paths:
-      - archives/ROLLBACK_MANIFEST.yaml  # Pointer to S3 archive
-      - evidence/                         # Audit evidence
-    expire_in: never  # Keep manifest permanently for audit trail
+      - archives/*.zip                      # Rollback archive
+      - archives/ROLLBACK_MANIFEST.yaml     # Rollback pointer
+      - evidence/*.zip                      # Audit evidence
+    expire_in: 1 year                       # Standard retention (adjust per environment)

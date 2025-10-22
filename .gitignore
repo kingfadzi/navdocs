@@ -3,6 +3,7 @@ bundles/
 archives/
 evidence/
 rollback-temp/
+snapshot-temp/
 ROLLBACK_MANIFEST.yaml
 
 # Deployment logs

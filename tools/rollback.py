@@ -13,8 +13,9 @@ import zipfile
 import shutil
 import json
 
-from deploy import run_import, load_yaml
+from deploy_utils import load_yaml, load_config
 from validate_bom import validate_bom
+from executors import get_executor
 
 def get_bom_section(bom_file, deployment_type):
     """Load the full BOM and return it as the section (BOMs are flat, not nested)."""
@@ -93,12 +94,12 @@ def validate_rollback_manifest(manifest, bom_target_server):
     print("  ✓ Target server matches.")
 
 
-def execute_rollback_from_archive(archive_path, target_url, import_script):
+def execute_rollback_from_archive(archive_path, target_url, import_script, target_server_config, config):
     """Core logic to perform the rollback from an extracted archive."""
     extract_dir = archive_path.parent / "deployment-extract"
     if extract_dir.exists():
         shutil.rmtree(extract_dir)
-    
+
     with zipfile.ZipFile(archive_path, 'r') as zipf:
         zipf.extractall(extract_dir)
     print(f"Extracted bundle to: {extract_dir}")
@@ -115,15 +116,23 @@ def execute_rollback_from_archive(archive_path, target_url, import_script):
     bundle_files = list((extract_dir / "bundles").glob("*.xml"))
     print(f"Found {len(bundle_files)} bundles to import.\n")
 
+    # Get executor for target server
+    executor = get_executor(config, target_server_config)
+
     for bundle in bundle_files:
-        run_import(import_script, target_url, str(bundle), flags, 'charset', 'nochange')
+        # LocalExecutor.import_bundle() doesn't need server_config
+        # RemoteKMigratorExecutor.import_bundle() needs server_config
+        if hasattr(executor, 'storage'):  # Remote executor
+            executor.import_bundle(import_script, target_url, str(bundle), flags, 'charset', 'nochange', target_server_config)
+        else:  # Local executor
+            executor.import_bundle(import_script, target_url, str(bundle), flags, 'charset', 'nochange')
 
     print("\nCleaning up temporary files...")
     shutil.rmtree(extract_dir.parent)
 
 
 def rollback(bom_file, deployment_type):
-    """Main rollback function."""
+    """Main rollback function with GitLab → S3 fallback."""
     # Validate the BOM file
     print("=" * 60)
     print("VALIDATING BOM FOR ROLLBACK")
@@ -148,10 +157,10 @@ def rollback(bom_file, deployment_type):
         print("Error: 'target_server' and 'rollback_pipeline_id' must be specified.")
         sys.exit(1)
 
-    # Load config using the same logic as deploy.py
-    from deploy import load_config
+    # Load config
     config = load_config()
     target_url = config['servers'][target_server]['url']
+    target_server_config = config['servers'][target_server]
     import_script = config['kmigrator']['import_script']
 
     print("=" * 60)
@@ -160,72 +169,105 @@ def rollback(bom_file, deployment_type):
     print(f"Target Server: {target_server}")
     print(f"Rollback Pipeline ID: {rollback_pipeline_id}")
 
-    # Step 1: Get ROLLBACK_MANIFEST
+    # Step 1: Try to get ROLLBACK_MANIFEST from GitLab
+    manifest = None
+    manifest_source = None
+    rollback_dir = None
+
     if str(rollback_pipeline_id).lower() == 'local':
+        # Local mode
         print("\nMode: Local")
         manifest_path = root / "archives" / "ROLLBACK_MANIFEST.yaml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            manifest = load_yaml(manifest_path)
+            manifest_source = 'local'
+        else:
             print(f"Error: ROLLBACK_MANIFEST.yaml not found in archives/")
             print("Hint: Run a 'deploy' command first to generate local artifacts.")
             sys.exit(1)
     else:
-        print("\nMode: GitLab")
-        rollback_dir = root / "rollback-temp"
-        if rollback_dir.exists():
-            shutil.rmtree(rollback_dir)
-        rollback_dir.mkdir()
+        # Try GitLab artifacts first
+        try:
+            print("\nAttempting rollback from GitLab artifacts...")
+            rollback_dir = root / "rollback-temp"
+            if rollback_dir.exists():
+                shutil.rmtree(rollback_dir)
+            rollback_dir.mkdir()
 
-        print("\nDownloading artifacts from GitLab...")
-        download_gitlab_artifacts(rollback_pipeline_id, rollback_dir)
+            download_gitlab_artifacts(rollback_pipeline_id, rollback_dir)
+            manifest_path = rollback_dir / "archives" / "ROLLBACK_MANIFEST.yaml"
 
-        manifest_path = rollback_dir / "archives" / "ROLLBACK_MANIFEST.yaml"
-        if not manifest_path.exists():
-            print(f"Error: ROLLBACK_MANIFEST.yaml not found in downloaded artifacts")
-            sys.exit(1)
+            if manifest_path.exists():
+                manifest = load_yaml(manifest_path)
+                manifest_source = 'gitlab'
+                print("✓ Found manifest in GitLab artifacts")
+            else:
+                raise FileNotFoundError("ROLLBACK_MANIFEST not in GitLab artifacts")
 
-    # Step 2: Read manifest
-    manifest = load_yaml(manifest_path)
-    validate_rollback_manifest(manifest, target_server)
+        except Exception as e:
+            print(f"GitLab artifacts not available: {e}")
+            print("\nAttempting fallback to S3 cold storage...")
+            manifest_source = 's3_fallback'
+            # We'll handle S3 fallback in the archive download step
 
-    archive_location = manifest.get('rollback_bundle_path')
-    storage_backend = manifest.get('storage_backend', 'local')
-
-    if not archive_location:
-        print("Error: 'rollback_bundle_path' not found in manifest.")
+    if not manifest and manifest_source != 's3_fallback':
+        print("ERROR: Could not retrieve ROLLBACK_MANIFEST from any source")
         sys.exit(1)
 
-    # Step 3: Download archive based on storage backend
+    # Step 2: Validate manifest (if we have it)
+    if manifest:
+        validate_rollback_manifest(manifest, target_server)
+
+    # Step 3: Download archive based on source
     temp_dir = root / "rollback-temp"
     temp_dir.mkdir(exist_ok=True)
 
-    if storage_backend == 's3':
-        # Import storage backend only when needed (to avoid AWS credential checks in local mode)
+    if manifest_source == 'gitlab':
+        # Try to use archive from GitLab artifacts
+        archive_path_str = manifest.get('rollback_bundle_path')
+        archive_path = rollback_dir / archive_path_str
+
+        if archive_path.exists():
+            print(f"\n✓ Using archive from GitLab artifacts: {archive_path.name}")
+            local_archive = archive_path
+        else:
+            print(f"\nWARNING: Archive not in GitLab artifacts")
+            print("Falling back to S3...")
+            manifest_source = 's3_fallback'
+
+    if manifest_source == 's3_fallback':
+        # Fallback to S3
+        s3_archive_url = manifest.get('s3_archive_url') if manifest else None
+        if not s3_archive_url:
+            print("ERROR: No S3 fallback URL available")
+            print("GitLab artifacts have expired and no S3 backup exists.")
+            sys.exit(1)
+
         from storage import get_storage_backend
         storage = get_storage_backend(config)
 
-        # Parse S3 URL: s3://bucket/archives/file.zip -> archives/file.zip
-        if not archive_location.startswith('s3://'):
-            print(f"Error: Invalid S3 URL format: {archive_location}")
-            sys.exit(1)
-
-        s3_key = archive_location.replace(f"s3://{config['s3']['bucket_name']}/", "")
+        # Parse S3 URL: s3://bucket/snapshots/54321/archives/file.zip
+        s3_key = s3_archive_url.replace(f"s3://{config['s3']['bucket_name']}/", "")
         local_archive = temp_dir / Path(s3_key).name
 
-        print(f"\nDownloading from S3: {archive_location}")
+        print(f"\nDownloading from S3: {s3_archive_url}")
         storage.download_file(s3_key, local_archive)
-    else:
+
+    elif manifest_source == 'local':
         # Local mode
-        local_archive = root / archive_location
-        if not local_archive.exists():
-            print(f"Error: Local archive not found at {local_archive}")
+        archive_path_str = manifest.get('rollback_bundle_path')
+        archive_path = root / archive_path_str
+        if not archive_path.exists():
+            print(f"ERROR: Local archive not found at {archive_path}")
             sys.exit(1)
-        # Copy to temp for consistent handling
-        temp_archive = temp_dir / local_archive.name
-        shutil.copy(local_archive, temp_archive)
+        # Copy to temp
+        temp_archive = temp_dir / archive_path.name
+        shutil.copy(archive_path, temp_archive)
         local_archive = temp_archive
 
     # Step 4: Execute rollback
-    execute_rollback_from_archive(local_archive, target_url, import_script)
+    print(f"\nRollback source: {manifest_source.upper()}")
+    execute_rollback_from_archive(local_archive, target_url, import_script, target_server_config, config)
 
     print("=" * 60)
     print("ROLLBACK COMPLETE")
