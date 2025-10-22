@@ -10,19 +10,28 @@ def load_yaml(file_path):
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
-def generate_vault_references(roles):
+def generate_vault_references(vault_configs):
     """
     Generate !reference directives for vault component before_scripts.
+    Exports required variables before each vault component call.
 
     Args:
-        roles: List of vault role names (e.g., ['ppm-dev', 's3'])
+        vault_configs: List of tuples (role, path, anchor_name)
+                      e.g., [('ppm-dev', 'secret/data/ppm/dev/useast', 'vault-ppm-dev'),
+                             ('s3-read', 'secret/data/shared/s3', 'vault-s3')]
 
     Returns:
-        YAML-formatted string with !reference directives
+        YAML-formatted string with variable exports and !reference directives
     """
     refs = ["    - !reference [.job_base, before_script]"]
-    for role in roles:
-        refs.append(f"    - !reference [.vault-{role}, before_script]")
+
+    for role, path, anchor in vault_configs:
+        # Export variables required by vault component
+        refs.append(f"    - export VAULT_ROLE={role}")
+        refs.append(f"    - export VAULT_SECRET_PATHS='[\"{path}\"]'")
+        # Call the vault component's before_script
+        refs.append(f"    - !reference [.{anchor}, before_script]")
+
     return "\n".join(refs)
 
 def generate_pipeline(bom_file_path, config_file_path, template_file_path):
@@ -74,13 +83,22 @@ include:
 
     # --- Step 3: Generate Vault References for Each Job ---
     # Extract job needs source PPM role + S3
-    extract_vault_refs = generate_vault_references([source_role, 's3'])
+    extract_vault_refs = generate_vault_references([
+        (source_role, source_path, f'vault-{source_role}'),
+        (s3_role, s3_path, 'vault-s3')
+    ])
 
     # Import job needs target PPM role + S3
-    import_vault_refs = generate_vault_references([target_role, 's3'])
+    import_vault_refs = generate_vault_references([
+        (target_role, target_path, f'vault-{target_role}'),
+        (s3_role, s3_path, 'vault-s3')
+    ])
 
     # Archive job needs target PPM role + S3
-    archive_vault_refs = generate_vault_references([target_role, 's3'])
+    archive_vault_refs = generate_vault_references([
+        (target_role, target_path, f'vault-{target_role}'),
+        (s3_role, s3_path, 'vault-s3')
+    ])
 
     # --- Step 4: Populate the Template ---
     with open(template_file_path, 'r') as f:
