@@ -131,16 +131,232 @@ This string is passed to kMigrator scripts to control deployment behavior.
 - Will fail if baseline dependencies missing
 - Forces proper promotion order (baseline first, then functional)
 
-### 3. **Deployment Script (`deploy.py`)**
-The single orchestrator for all actions, used by both the pipeline and users.
+### 3. **Deployment Orchestrator**
+The deployment orchestrator (`tools.deployment.orchestrator`) is the single entry point for all deployment actions, used by both the pipeline and users.
 - **Staged Commands:** `extract`, `import`, `archive` for the CI/CD pipeline.
 - **One-Shot Command:** `deploy` for convenient local end-to-end execution.
 - **Rollback Command:** `rollback` for manual rollback operations.
+- **Vault Config:** `get-vault-config` for generating vault component includes.
 
 ### 4. **GitLab Pipeline**
 A simple, two-stage pipeline defined in `.gitlab-ci.yml`:
 - **`validate`:** Two separate validation jobs (`validate_baseline` and `validate_functional`) run when their respective BOM files change. Uses GitLab's `changes:` keyword to detect file modifications.
 - **`deploy`:** Two separate deployment jobs (`deploy_baseline` and `deploy_functional`) trigger child pipelines. Each uses `changes:` to run only when its BOM file is modified. The `needs: [deploy_baseline]` with `optional: true` ensures baseline runs first when both files change.
+
+### 5. **Tool Package Structure**
+
+The deployment automation is organized into modular Python packages for maintainability:
+
+```
+tools/
+├── config/           # Configuration, validation, and pipeline generation
+│   ├── validation.py  # BOM validation and governance rules
+│   ├── flags.py       # Profile flag compiler
+│   └── pipeline.py    # GitLab CI child pipeline generator
+├── deployment/       # Core deployment and orchestration
+│   ├── orchestrator.py  # Main deployment orchestrator
+│   ├── rollback.py      # Rollback operations
+│   ├── utils.py         # Shared utilities
+│   └── archive.py       # Archive and snapshot creation
+├── executors/        # Command execution abstraction
+│   ├── local.py       # Local executor (mock mode)
+│   ├── remote.py      # Remote executor (SSH + S3)
+│   └── ssh.py         # SSH connection handling
+└── storage/          # Storage backend abstraction
+    ├── base.py        # Storage interface
+    ├── local.py       # Local filesystem storage
+    └── s3.py          # S3/MinIO storage
+```
+
+**Invocation:**
+- **Old format** (deprecated): `python3 tools/deploy.py`
+- **New format** (current): `python3 -m tools.deployment.orchestrator`
+
+All modules support both direct execution and package import for flexibility.
+
+---
+
+## Storage Backend Architecture
+
+The system supports two storage modes for deployment bundles, selected via `deployment.storage_backend` in `config/deployment-config.yaml`:
+
+### **Local Storage** (Development/Testing)
+- **Use case:** Local development, testing without PPM servers
+- **Configuration:** `storage_backend: "local"`
+- **Bundle location:** `./bundles/` directory
+- **Behavior:** No network transfer, bundles stay on local filesystem
+
+### **S3/MinIO Storage** (Production)
+- **Use case:** Production CI/CD with remote PPM servers
+- **Configuration:** `storage_backend: "s3"`
+- **Bundle location:** S3 bucket (e.g., `s3://ppm-deployment-bundles/bundles/`)
+- **Credentials:** AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (from Vault)
+
+**Bundle Flow in S3 Mode:**
+
+**Extract Stage:**
+```
+PPM Server → SSH download to Runner → Upload to S3 → Download back for GitLab artifacts
+```
+- Why download back? Next stages (import/archive) need bundles as GitLab artifacts
+
+**Import Stage:**
+```
+S3 → Download to Runner → SSH upload to PPM Server
+```
+
+**Archive Stage:**
+```
+Create archive ZIP → Upload to S3 → Copy to GitLab artifacts
+```
+
+**Key Point:** In S3 mode, bundles exist in THREE places:
+1. S3 (permanent, for long-term rollback)
+2. GitLab artifacts (temporary, for current pipeline stages)
+3. S3 snapshots (complete deployment snapshot with manifest)
+
+---
+
+## Execution Modes
+
+The system auto-selects between two execution modes based on configuration:
+
+### **Local Executor** (Mock Mode)
+- **Triggered when:** No `ssh_host` configured OR `storage_backend: "local"`
+- **Use case:** Development, testing without real PPM
+- **Behavior:**
+  - Uses mock kMigrator scripts (`mock/kMigratorExtract.sh`, `mock/kMigratorImport.sh`)
+  - Bundles stay on local filesystem
+  - No SSH connections
+  - Fast, safe for testing
+
+**Setup:**
+```yaml
+# config/deployment-config.local.yaml
+deployment:
+  storage_backend: "local"
+kmigrator:
+  extract_script: "./mock/kMigratorExtract.sh"
+  import_script: "./mock/kMigratorImport.sh"
+```
+
+```bash
+export DEPLOYMENT_ENV=local
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
+```
+
+### **Remote Executor** (Production Mode)
+- **Triggered when:** `ssh_host` configured AND `storage_backend: "s3"`
+- **Use case:** Production CI/CD
+- **Behavior:**
+  - SSH to PPM servers to run real kMigrator scripts
+  - Bundles stored in S3
+  - Requires SSH credentials (from Vault)
+  - Requires S3 credentials (from Vault)
+
+**SSH Configuration:**
+```yaml
+servers:
+  prod-ppm-useast:
+    url: "https://ppm-prod.company.com"
+    ssh_host: "ppm-prod.company.com"
+    ssh_port: 22
+    ssh_username_env: "PPM_SERVICE_ACCOUNT_USER"
+    ssh_password_env: "PPM_SERVICE_ACCOUNT_PASSWORD"
+```
+
+**Auto-Selection Logic:**
+```python
+if ssh_host AND storage_backend == 's3':
+    use RemoteExecutor (SSH + S3)
+else:
+    use LocalExecutor (mock scripts)
+```
+
+---
+
+## Vault Integration & Secrets Management
+
+Secrets are injected from HashiCorp Vault via GitLab CI/CD components.
+
+### **Vault Component Providers**
+
+The system supports pluggable vault components configured in `config/deployment-config.yaml`:
+
+```yaml
+vault_component_providers:
+  standard:
+    component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
+    component_version: "v1.0.3"
+```
+
+### **Per-Server Vault Roles**
+
+Each server defines its vault role for credential retrieval:
+
+```yaml
+servers:
+  dev-ppm-useast:
+    url: "https://ppm-dev.company.com"
+    vault_roles:
+      - name: ppm-dev
+        path: secret/data/ppm/dev/useast
+```
+
+**Exported Environment Variables:**
+- `PPM_SERVICE_ACCOUNT_USER` - Service account username (for SSH and kMigrator)
+- `PPM_SERVICE_ACCOUNT_PASSWORD` - Service account password (for SSH and kMigrator)
+
+### **S3 Vault Configuration**
+
+```yaml
+s3:
+  bucket_name: "ppm-deployment-bundles"
+  vault_roles:
+    - name: s3-read
+      path: secret/data/shared/s3
+```
+
+**Exported Environment Variables:**
+- `AWS_ACCESS_KEY_ID` - S3/MinIO access key
+- `AWS_SECRET_ACCESS_KEY` - S3/MinIO secret key
+
+### **Pipeline Workflow**
+
+1. **Before job starts:** GitLab CI component fetches secrets from Vault
+2. **Component exports:** Secrets as environment variables
+3. **Job runs:** Deployment tools read credentials from environment
+4. **After job:** Secrets are cleared automatically
+
+**No credentials in code or config files!**
+
+---
+
+## Required Environment Variables
+
+Production deployments require these environment variables (injected by Vault):
+
+| Variable | Required For | Source | Example Value |
+|----------|--------------|--------|---------------|
+| `PPM_SERVICE_ACCOUNT_USER` | SSH authentication & kMigrator | Vault: `secret/data/ppm/{env}/useast` | `svc_kmigrator` |
+| `PPM_SERVICE_ACCOUNT_PASSWORD` | SSH authentication & kMigrator | Vault: `secret/data/ppm/{env}/useast` | (secret) |
+| `AWS_ACCESS_KEY_ID` | S3/MinIO storage | Vault: `secret/data/shared/s3` | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | S3/MinIO storage | Vault: `secret/data/shared/s3` | (secret) |
+| `DEPLOYMENT_ENV` | Local testing override | Manual (local dev only) | `local` |
+
+**Local Development:**
+```bash
+# For local testing without Vault
+export DEPLOYMENT_ENV=local
+export PPM_USERNAME=your_username
+export PPM_PASSWORD=your_password
+
+python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
+```
+
+**Production (CI/CD):**
+- All credentials injected automatically by Vault component
+- No manual export needed
 
 ---
 
@@ -187,7 +403,7 @@ Deploy frequently once baseline is stable.
 
 ## Governance Rules Engine
 
-The system includes an automated rules engine that validates all BOM files before deployment. Rules are defined in `config/rules.yaml` and enforced by `validate_bom.py` during the validate stage.
+The system includes an automated rules engine that validates all BOM files before deployment. Rules are defined in `config/rules.yaml` and enforced by the BOM validator (`tools.config.validation`) during the validate stage.
 
 ### **Critical Rules (Enabled by Default)**
 
@@ -457,7 +673,7 @@ Both artifacts stored in GitLab pipeline artifacts (prod: 1 year retention)
 * **Declarative** - BOMs are version-controlled, reviewed via MR
 * **Idempotent** - Same BOM = same result (safe to rerun)
 * **Testable** - Mock scripts work without real PPM
-* **Lean** - Reuses `deploy.py` for local and CI/CD
+* **Lean** - Reuses orchestrator for local and CI/CD
 * **Traceable** - Git commits + GitLab artifacts = full audit trail
 
 ---
@@ -466,7 +682,7 @@ Both artifacts stored in GitLab pipeline artifacts (prod: 1 year retention)
 
 ### **For Platform Engineers:**
 - No manual flag strings (compiled from profiles)
-- No manual kMigrator commands (automated by deploy.py)
+- No manual kMigrator commands (automated by orchestrator)
 - Instant rollback (download from GitLab artifacts, redeploy)
 
 ### **For Operations:**
