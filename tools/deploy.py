@@ -80,13 +80,39 @@ def extract_command(bom_file, deployment_type):
                 bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'])
             bundles.append(bundle)
 
+    # Download bundles locally for GitLab artifacts (if in S3 mode)
+    # This ensures bundles are available in extract stage artifacts
+    if storage_mode == 's3':
+        print(f"\nDownloading {len(bundles)} bundles locally for GitLab artifacts...")
+        bundle_dir = root / "bundles"
+        bundle_dir.mkdir(exist_ok=True)
+
+        from storage import get_storage_backend
+        storage = get_storage_backend(config)
+
+        local_bundles = []
+        for bundle_meta in bundles:
+            bundle_filename = bundle_meta['bundle_filename']
+            s3_key = bundle_meta['s3_key']
+            local_path = bundle_dir / bundle_filename
+
+            print(f"  Downloading {bundle_filename}...")
+            storage.download_file(s3_key, local_path)
+            local_bundles.append(str(local_path))
+
+        print(f"✓ Downloaded {len(local_bundles)} bundles for GitLab artifacts")
+        # Update bundles to point to local paths for import/archive stages
+        # But keep S3 metadata in a separate field for reference
+        bundles_s3_metadata = bundles
+        bundles = local_bundles
+
     metadata = {
         'deployment_type': deployment_type,
         'profile': profile_name,
         'source_server': source_server,
         'target_server': target_server,
         'flags': flags,
-        'bundles': bundles,  # Either local paths or S3 metadata dicts
+        'bundles': bundles,  # Local paths (always available as GitLab artifacts)
         'storage_mode': storage_mode,
         'bom_file': str(bom_file),
         'bom_version': bom.get('version', 'unknown'),
@@ -108,7 +134,7 @@ def import_command(bom_file, deployment_type):
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     target_server = metadata['target_server']
     flags = metadata['flags']
-    bundles = metadata['bundles']
+    bundles = metadata['bundles']  # Always local paths from GitLab artifacts
     i18n_mode = metadata['i18n_mode']
     refdata_mode = metadata['refdata_mode']
     storage_mode = metadata.get('storage_mode', 'local')
@@ -123,9 +149,10 @@ def import_command(bom_file, deployment_type):
 
     print(f"Target: {target_server}, Storage: {storage_mode.upper()}, Bundles: {len(bundles)}")
     print(f"Flags: {flags}\n")
-    print(f"Importing {len(bundles)} bundles...\n")
+    print(f"Importing {len(bundles)} bundles from GitLab artifacts...\n")
 
     for bundle in bundles:
+        # Bundles are always local file paths (from GitLab artifacts)
         # LocalExecutor.import_bundle() doesn't need server_config
         # RemoteKMigratorExecutor.import_bundle() needs server_config
         if hasattr(executor, 'storage'):  # Remote executor

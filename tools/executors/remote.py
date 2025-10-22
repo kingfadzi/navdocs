@@ -109,14 +109,14 @@ class RemoteKMigratorExecutor(BaseExecutor):
             self.ssh.ssh_exec(server_config, f"rm -rf {remote_bundle_dir}")
             raise
 
-    def import_bundle(self, script_path, url, bundle_metadata, flags, i18n, refdata, server_config):
+    def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config):
         """
-        Import bundle from storage to remote server.
+        Import bundle from local file (GitLab artifact) to remote server.
 
         Args:
             script_path: Path to kMigrator import script on remote server
             url: PPM server URL
-            bundle_metadata: S3 metadata dict with bundle_filename, s3_key, etc.
+            bundle_file: Local file path to bundle (from GitLab artifacts)
             flags: 25-character kMigrator flag string
             i18n: i18n mode (e.g., 'charset', 'none')
             refdata: Reference data mode (e.g., 'nochange')
@@ -127,8 +127,9 @@ class RemoteKMigratorExecutor(BaseExecutor):
         """
         username, password = get_credentials()
 
-        # Extract bundle info from metadata
-        bundle_filename = bundle_metadata.get('bundle_filename')
+        # Get bundle filename from local path
+        from pathlib import Path
+        bundle_filename = Path(bundle_file).name
 
         # Generate remote paths
         pipeline_id = os.environ.get('CI_PIPELINE_ID', 'local')
@@ -137,15 +138,16 @@ class RemoteKMigratorExecutor(BaseExecutor):
 
         ssh_host = server_config['ssh_host']
 
-        print(f"Importing {bundle_filename} to {url} (S3 → REMOTE)")
+        print(f"Importing {bundle_filename} to {url} (GITLAB ARTIFACT → REMOTE)")
         print(f"Remote: {username}@{ssh_host}")
 
         try:
             # Step 1: Create remote directory
             self.ssh.ssh_exec_check(server_config, f"mkdir -p {remote_bundle_dir}")
 
-            # Step 2: Download bundle from storage to remote server
-            self.storage.download_to_server(self.ssh, server_config, bundle_metadata, remote_bundle_file)
+            # Step 2: Upload bundle from local (GitLab artifact) to remote server
+            print(f"Uploading bundle to remote server...")
+            self.ssh.scp_upload(server_config, bundle_file, remote_bundle_file)
 
             # Step 3: Execute kMigrator import
             kmigrator_cmd = (

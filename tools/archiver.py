@@ -54,7 +54,7 @@ def create_evidence_package(bom_file, archive_path, config):
 def archive_deployment(bundles, bom_file, flags, config):
     """
     Create a ZIP archive with bundles + BOM + flags for rollback.
-    Handles both local file paths and S3 metadata dictionaries.
+    Bundles are always local file paths (from GitLab artifacts).
     """
     root = Path(__file__).parent.parent
     archive_dir = root / config['deployment']['archive_dir']
@@ -65,44 +65,26 @@ def archive_deployment(bundles, bom_file, flags, config):
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
     archive_name = f"{change_request}-v{version}-{timestamp}-bundles.zip"
     archive_path = archive_dir / archive_name
-    print(f"Creating deployment archive: {archive_name}")
+    print(f"Creating deployment archive from GitLab artifacts: {archive_name}")
 
-    storage = get_storage_backend(config)
-    temp_dir = root / "temp_archive_bundles"
-    temp_dir.mkdir(exist_ok=True)
     bundle_filenames = []
 
-    try:
-        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for bundle_meta in bundles:
-                if isinstance(bundle_meta, dict):  # S3 mode
-                    bundle_filename = bundle_meta.get('bundle_filename')
-                    s3_key = bundle_meta.get('s3_key')
-                    s3_bucket = bundle_meta.get('s3_bucket')
-                    local_path = temp_dir / bundle_filename
+    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for bundle_path in bundles:
+            # Bundles are always local paths (from GitLab artifacts)
+            local_path = Path(bundle_path)
+            bundle_filename = local_path.name
+            zipf.write(local_path, arcname=f"bundles/{bundle_filename}")
+            bundle_filenames.append(bundle_filename)
 
-                    print(f"Downloading {s3_key} for archival...")
-                    storage._get_client().download_file(s3_bucket, s3_key, str(local_path))
-
-                    zipf.write(local_path, arcname=f"bundles/{bundle_filename}")
-                    bundle_filenames.append(bundle_filename)
-                else:  # Local mode
-                    local_path = bundle_meta
-                    bundle_filename = Path(local_path).name
-                    zipf.write(local_path, arcname=f"bundles/{bundle_filename}")
-                    bundle_filenames.append(bundle_filename)
-
-            zipf.write(bom_file, arcname="bom.yaml")
-            zipf.writestr("flags.txt", flags)
-            manifest = {
-                'version': version, 'change_request': change_request,
-                'archived_at': datetime.now().isoformat(),
-                'bundles': bundle_filenames, 'flags': flags
-            }
-            zipf.writestr("manifest.yaml", yaml.dump(manifest))
-    finally:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+        zipf.write(bom_file, arcname="bom.yaml")
+        zipf.writestr("flags.txt", flags)
+        manifest = {
+            'version': version, 'change_request': change_request,
+            'archived_at': datetime.now().isoformat(),
+            'bundles': bundle_filenames, 'flags': flags
+        }
+        zipf.writestr("manifest.yaml", yaml.dump(manifest))
 
     print(f"Archive created: {archive_path}")
     return archive_path
@@ -151,23 +133,16 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
     print(f"CREATING COMPLETE SNAPSHOT (Pipeline {pipeline_id})")
     print("=" * 60)
 
-    # 1. Collect bundles
+    # 1. Collect bundles (from GitLab artifacts)
     bundles_dir = snapshot_dir / "bundles"
     bundles_dir.mkdir(exist_ok=True)
 
-    storage = get_storage_backend(config)
-    for bundle_meta in metadata['bundles']:
-        if isinstance(bundle_meta, dict):  # S3 mode
-            bundle_filename = bundle_meta['bundle_filename']
-            s3_key = bundle_meta['s3_key']
-            local_path = bundles_dir / bundle_filename
-            print(f"Downloading bundle for snapshot: {bundle_filename}")
-            storage.download_file(s3_key, local_path)
-        else:  # Local mode
-            bundle_path = Path(bundle_meta)
-            if bundle_path.exists():
-                shutil.copy(bundle_path, bundles_dir / bundle_path.name)
-                print(f"Copied bundle for snapshot: {bundle_path.name}")
+    for bundle_path in metadata['bundles']:
+        # Bundles are always local paths (from GitLab artifacts)
+        bundle_file = Path(bundle_path)
+        if bundle_file.exists():
+            shutil.copy(bundle_file, bundles_dir / bundle_file.name)
+            print(f"Copied bundle for snapshot: {bundle_file.name}")
 
     # 2. Copy metadata
     metadata_file = root / f"bundles/{deployment_type}-metadata.yaml"
