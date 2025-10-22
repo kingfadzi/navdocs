@@ -1,6 +1,6 @@
 # templates/child-pipeline-template.yml
 # This is a template for the dynamically generated child pipeline.
-# The generator script will replace %%SOURCE_ROLE%% and %%TARGET_ROLE%%.
+# Uses !reference to explicitly call vault component before_scripts.
 
 stages:
   - extract
@@ -18,10 +18,9 @@ stages:
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 extract:
-  extends:
-    - .job_base
-    - .vault-%%SOURCE_ROLE%%  # Placeholder for the source role
-    - .vault-s3
+  extends: [.job_base]
+  before_script:
+%%EXTRACT_VAULT_REFS%%
   stage: extract
   script:
     - echo "Executing EXTRACT stage..."
@@ -32,10 +31,9 @@ extract:
     expire_in: 1 hour
 
 import:
-  extends:
-    - .job_base
-    - .vault-%%TARGET_ROLE%%  # Placeholder for the target role
-    - .vault-s3
+  extends: [.job_base]
+  before_script:
+%%IMPORT_VAULT_REFS%%
   stage: import
   script:
     - echo "Executing IMPORT stage..."
@@ -43,10 +41,9 @@ import:
   needs: [extract]
 
 archive:
-  extends:
-    - .job_base
-    - .vault-%%TARGET_ROLE%%  # Placeholder for the target role
-    - .vault-s3
+  extends: [.job_base]
+  before_script:
+%%ARCHIVE_VAULT_REFS%%
   stage: archive
   script:
     - echo "Executing ARCHIVE stage..."

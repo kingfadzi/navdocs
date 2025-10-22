@@ -10,6 +10,21 @@ def load_yaml(file_path):
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
+def generate_vault_references(roles):
+    """
+    Generate !reference directives for vault component before_scripts.
+
+    Args:
+        roles: List of vault role names (e.g., ['ppm-dev', 's3'])
+
+    Returns:
+        YAML-formatted string with !reference directives
+    """
+    refs = ["    - !reference [.job_base, before_script]"]
+    for role in roles:
+        refs.append(f"    - !reference [.vault-{role}, before_script]")
+    return "\n".join(refs)
+
 def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     """Generates the child pipeline YAML by populating a template."""
 
@@ -57,15 +72,26 @@ include:
 
 """
 
-    # --- Step 3: Populate the Template (The Presentation) ---
+    # --- Step 3: Generate Vault References for Each Job ---
+    # Extract job needs source PPM role + S3
+    extract_vault_refs = generate_vault_references([source_role, 's3'])
+
+    # Import job needs target PPM role + S3
+    import_vault_refs = generate_vault_references([target_role, 's3'])
+
+    # Archive job needs target PPM role + S3
+    archive_vault_refs = generate_vault_references([target_role, 's3'])
+
+    # --- Step 4: Populate the Template ---
     with open(template_file_path, 'r') as f:
         template_content = f.read()
 
-    # Replace placeholders
-    pipeline_content = template_content.replace('%%SOURCE_ROLE%%', source_role)
-    pipeline_content = pipeline_content.replace('%%TARGET_ROLE%%', target_role)
+    # Replace vault reference placeholders
+    pipeline_content = template_content.replace('%%EXTRACT_VAULT_REFS%%', extract_vault_refs)
+    pipeline_content = pipeline_content.replace('%%IMPORT_VAULT_REFS%%', import_vault_refs)
+    pipeline_content = pipeline_content.replace('%%ARCHIVE_VAULT_REFS%%', archive_vault_refs)
 
-    # --- Step 4: Output the final YAML with includes prepended ---
+    # --- Step 5: Output the final YAML with includes prepended ---
     print(vault_includes + pipeline_content)
 
 if __name__ == '__main__':
