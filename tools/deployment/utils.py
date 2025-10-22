@@ -74,12 +74,10 @@ def load_deployment_metadata(metadata_path="bundles/deployment-metadata.yaml"):
 def get_flag_string(profile_name):
     """
     Get compiled flag string from profile.
-    Calls flag_compiler.py and returns the 25-character Y/N string.
+    Calls flag compiler module and returns the 25-character Y/N string.
     """
-    script_dir = Path(__file__).parent
-    compiler = script_dir / "flag_compiler.py"
     result = subprocess.run(
-        ['python3', str(compiler), profile_name],
+        ['python3', '-m', 'tools.config.flags', profile_name],
         capture_output=True, text=True, check=True
     )
     return result.stdout.strip()
