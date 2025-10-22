@@ -13,7 +13,7 @@ import zipfile
 import shutil
 import json
 
-from deploy_utils import load_yaml, load_config
+from deploy_utils import load_yaml, load_config, apply_default_credentials
 from validate_bom import validate_bom
 from executors import get_executor
 
@@ -157,6 +157,7 @@ def rollback(bom_file, deployment_type):
     config = load_config()
     target_url = config['servers'][target_server]['url']
     target_server_config = config['servers'][target_server]
+    apply_default_credentials(target_server_config, config)
     import_script = config['kmigrator']['import_script']
 
     print("=" * 60)

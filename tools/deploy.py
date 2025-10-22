@@ -16,7 +16,7 @@ from deploy_utils import (
     load_yaml, load_config,
     save_deployment_metadata, load_deployment_metadata,
     get_flag_string, validate_bom_before_action,
-    get_vault_config_command
+    get_vault_config_command, apply_default_credentials
 )
 from archiver import (
     archive_deployment, create_evidence_package,
@@ -42,6 +42,7 @@ def extract_command(bom_file, deployment_type):
     config = load_config()
     source_url = config['servers'][source_server]['url']
     source_server_config = config['servers'][source_server]
+    apply_default_credentials(source_server_config, config)
     extract_script = config['kmigrator']['extract_script']
     flags = get_flag_string(profile_name)
 
@@ -134,6 +135,7 @@ def import_command(bom_file, deployment_type):
     config = load_config()
     target_url = config['servers'][target_server]['url']
     target_server_config = config['servers'][target_server]
+    apply_default_credentials(target_server_config, config)
     import_script = config['kmigrator']['import_script']
 
     # Get executor for target server

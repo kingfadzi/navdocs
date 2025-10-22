@@ -85,23 +85,64 @@ def get_flag_string(profile_name):
     return result.stdout.strip()
 
 
+def apply_default_credentials(server_config, config):
+    """
+    Apply default credentials to server config if not already present.
+
+    Args:
+        server_config: Server configuration dict
+        config: Full deployment configuration dict
+
+    Returns:
+        Server config with credential env vars populated (in-place modification)
+    """
+    # If server doesn't have explicit credential env vars, use defaults
+    if 'ssh_username_env' not in server_config:
+        default_creds = config.get('default_credentials', {})
+        if 'ssh_username_env' in default_creds:
+            server_config['ssh_username_env'] = default_creds['ssh_username_env']
+
+    if 'ssh_password_env' not in server_config:
+        default_creds = config.get('default_credentials', {})
+        if 'ssh_password_env' in default_creds:
+            server_config['ssh_password_env'] = default_creds['ssh_password_env']
+
+    return server_config
+
+
 def get_credentials(server_config=None):
     """
     Get PPM service account credentials from environment.
 
     Args:
-        server_config: Optional server configuration dict with ssh_username_env and ssh_password_env
+        server_config: Server configuration dict. Must contain ssh_username_env and ssh_password_env.
+                      NO DEFAULTS - configuration must be explicit.
 
     Returns:
         Tuple of (username, password) or exits if not found.
     """
-    # Get credential env var names from server config with defaults
-    if server_config:
-        username_env = server_config.get('ssh_username_env', 'PPM_SERVICE_ACCOUNT_USER')
-        password_env = server_config.get('ssh_password_env', 'PPM_SERVICE_ACCOUNT_PASSWORD')
-    else:
-        username_env = 'PPM_SERVICE_ACCOUNT_USER'
-        password_env = 'PPM_SERVICE_ACCOUNT_PASSWORD'
+    # Require explicit configuration - NO implicit defaults
+    if not server_config:
+        print("ERROR: server_config must be provided to get_credentials()")
+        sys.exit(1)
+
+    username_env = server_config.get('ssh_username_env')
+    password_env = server_config.get('ssh_password_env')
+
+    # Fail fast if credential env vars are not configured
+    if not username_env or not password_env:
+        print("ERROR: Credential environment variable names not configured")
+        print("Required in server config: 'ssh_username_env' and 'ssh_password_env'")
+        print("\nAdd to config/deployment-config.yaml:")
+        print("  servers:")
+        print("    your-server:")
+        print("      ssh_username_env: 'YOUR_USERNAME_ENV'")
+        print("      ssh_password_env: 'YOUR_PASSWORD_ENV'")
+        print("\nOr add default_credentials at top level:")
+        print("  default_credentials:")
+        print("    ssh_username_env: 'PPM_SERVICE_ACCOUNT_USER'")
+        print("    ssh_password_env: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
+        sys.exit(1)
 
     # Read credentials from configured env vars
     username = os.environ.get(username_env)

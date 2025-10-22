@@ -21,9 +21,22 @@ class RemoteExecutor:
         Returns:
             Tuple of (username, password, username_env_name, password_env_name)
         """
-        # Get credential env var names from config with defaults
-        username_env = ssh_config.get('ssh_username_env', 'PPM_SERVICE_ACCOUNT_USER')
-        password_env = ssh_config.get('ssh_password_env', 'PPM_SERVICE_ACCOUNT_PASSWORD')
+        # Get credential env var names from config (NO DEFAULTS - must be explicit)
+        username_env = ssh_config.get('ssh_username_env')
+        password_env = ssh_config.get('ssh_password_env')
+
+        # Fail fast if credential env vars are not configured
+        if not username_env or not password_env:
+            raise ValueError(
+                "ERROR: Credential environment variable names not configured.\n"
+                "Required in server config: 'ssh_username_env' and 'ssh_password_env'\n"
+                "Add to config/deployment-config.yaml:\n"
+                "  servers:\n"
+                "    your-server:\n"
+                "      ssh_username_env: 'YOUR_USERNAME_ENV'\n"
+                "      ssh_password_env: 'YOUR_PASSWORD_ENV'\n"
+                "Or set default_credentials at top level."
+            )
 
         # Read credentials from configured env vars
         username = os.environ.get(username_env)
