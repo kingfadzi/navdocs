@@ -11,15 +11,34 @@ import os
 class RemoteExecutor:
     """SSH remote executor using sshpass."""
 
+    def _get_credentials(self, ssh_config):
+        """
+        Get SSH credentials from environment variables.
+
+        Args:
+            ssh_config: Server configuration dict (may contain ssh_username_env, ssh_password_env)
+
+        Returns:
+            Tuple of (username, password, username_env_name, password_env_name)
+        """
+        # Get credential env var names from config with defaults
+        username_env = ssh_config.get('ssh_username_env', 'PPM_SERVICE_ACCOUNT_USER')
+        password_env = ssh_config.get('ssh_password_env', 'PPM_SERVICE_ACCOUNT_PASSWORD')
+
+        # Read credentials from configured env vars
+        username = os.environ.get(username_env)
+        password = os.environ.get(password_env)
+
+        return username, password, username_env, password_env
+
     def ssh_exec(self, ssh_config, command, env=None):
         """Execute command on remote server via SSH."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
-        ssh_password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+        ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
         ssh_port = ssh_config.get('ssh_port', 22)
 
         if not ssh_user or not ssh_password:
-            raise ValueError("SSH credentials not found: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD required")
+            raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
 
         if env is None:
             env = os.environ.copy()
@@ -55,11 +74,11 @@ class RemoteExecutor:
     def build_ssh_cmd(self, ssh_config, remote_command):
         """Build sshpass + ssh command list."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
+        ssh_user, _, username_env, _ = self._get_credentials(ssh_config)
         ssh_port = ssh_config.get('ssh_port', 22)
 
         if not ssh_user:
-            raise ValueError("SSH user not found: PPM_SERVICE_ACCOUNT_USER required")
+            raise ValueError(f"SSH user not found: {username_env} required")
 
         return [
             'sshpass', '-e',
@@ -74,12 +93,11 @@ class RemoteExecutor:
     def scp_download(self, ssh_config, remote_path, local_path):
         """Download file from remote server via SCP."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
-        ssh_password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+        ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
         ssh_port = ssh_config.get('ssh_port', 22)
 
         if not ssh_user or not ssh_password:
-            raise ValueError("SSH credentials not found: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD required")
+            raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
 
         env = os.environ.copy()
         env['SSHPASS'] = ssh_password
@@ -103,12 +121,11 @@ class RemoteExecutor:
     def scp_upload(self, ssh_config, local_path, remote_path):
         """Upload file to remote server via SCP."""
         ssh_host = ssh_config['ssh_host']
-        ssh_user = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
-        ssh_password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+        ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
         ssh_port = ssh_config.get('ssh_port', 22)
 
         if not ssh_user or not ssh_password:
-            raise ValueError("SSH credentials not found: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD required")
+            raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
 
         env = os.environ.copy()
         env['SSHPASS'] = ssh_password

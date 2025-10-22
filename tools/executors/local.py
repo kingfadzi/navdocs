@@ -24,7 +24,7 @@ class LocalExecutor(BaseExecutor):
     Used for testing and development with mock scripts.
     """
 
-    def extract(self, script_path, url, entity_id, reference_code=None):
+    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
         """
         Extract entity locally (mock mode).
 
@@ -33,11 +33,12 @@ class LocalExecutor(BaseExecutor):
             url: PPM server URL
             entity_id: Entity ID to extract
             reference_code: Optional reference code for specific entity
+            server_config: Optional server configuration dict (for credential resolution)
 
         Returns:
             Local file path to extracted bundle
         """
-        username, password = get_credentials()
+        username, password = get_credentials(server_config)
 
         cmd = [
             'bash', script_path, '-username', username, '-password', password,
@@ -62,7 +63,7 @@ class LocalExecutor(BaseExecutor):
         files = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
         return files[0] if files else None
 
-    def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata):
+    def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config=None):
         """
         Import bundle locally (mock mode).
 
@@ -73,11 +74,12 @@ class LocalExecutor(BaseExecutor):
             flags: 25-character kMigrator flag string
             i18n: i18n mode (e.g., 'charset', 'none')
             refdata: Reference data mode (e.g., 'nochange')
+            server_config: Optional server configuration dict (for credential resolution)
 
         Returns:
             None (prints output)
         """
-        username, password = get_credentials()
+        username, password = get_credentials(server_config)
 
         cmd = [
             'bash', script_path, '-username', username, '-password', password,

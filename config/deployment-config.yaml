@@ -47,6 +47,13 @@ vault_component_providers:
 # Global default vault component provider (can be overridden per server or S3)
 vault_component_provider: "standard"
 
+# Default credential environment variable names
+# These are used for SSH authentication and kMigrator operations
+# Can be overridden per server if vault components export different variable names
+default_credentials:
+  ssh_username_env: "PPM_SERVICE_ACCOUNT_USER"
+  ssh_password_env: "PPM_SERVICE_ACCOUNT_PASSWORD"
+
 # S3/MinIO configuration
 s3:
   bucket_name: "ppm-deployment-bundles"
@@ -103,6 +110,8 @@ servers:
     region: useast
     ssh_host: "helios"
     # vault_component_provider: "csm"  # Optional: Override vault provider for this server (defaults to global)
+    # ssh_username_env: "CSM_USER_ppm_prod"  # Optional: Override credential env var names (defaults to global)
+    # ssh_password_env: "CSM_PASS_ppm_prod"  # Optional: Override credential env var names (defaults to global)
     vault_roles:
       - name: ppm-prod
         path: secret/data/ppm/prod/useast

@@ -212,6 +212,9 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
     s3_snapshot_url = None
 
     if storage_mode == 's3':
+        # Get storage backend for S3 uploads
+        storage = get_storage_backend(config)
+
         s3_prefix = f"snapshots/{pipeline_id}"
 
         print(f"\nUploading snapshot to S3: s3://{config['s3']['bucket_name']}/{s3_prefix}/")

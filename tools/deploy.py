@@ -62,22 +62,14 @@ def extract_command(bom_file, deployment_type):
         profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
         print(f"Extracting {len(profile['entities'])} baseline entity types...\n")
         for entity in profile['entities']:
-            # LocalExecutor.extract() doesn't need server_config
-            # RemoteKMigratorExecutor.extract() needs server_config
-            if hasattr(executor, 'storage'):  # Remote executor
-                bundle = executor.extract(extract_script, source_url, entity['id'], None, source_server_config)
-            else:  # Local executor
-                bundle = executor.extract(extract_script, source_url, entity['id'], None)
+            # Pass server_config for credential resolution
+            bundle = executor.extract(extract_script, source_url, entity['id'], None, source_server_config)
             bundles.append(bundle)
     else:
         print(f"Extracting {len(bom['entities'])} functional entities...\n")
         for entity in bom['entities']:
-            # LocalExecutor.extract() doesn't need server_config
-            # RemoteKMigratorExecutor.extract() needs server_config
-            if hasattr(executor, 'storage'):  # Remote executor
-                bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'], source_server_config)
-            else:  # Local executor
-                bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'])
+            # Pass server_config for credential resolution
+            bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'], source_server_config)
             bundles.append(bundle)
 
     # Download bundles locally for GitLab artifacts (if in S3 mode)
@@ -153,12 +145,8 @@ def import_command(bom_file, deployment_type):
 
     for bundle in bundles:
         # Bundles are always local file paths (from GitLab artifacts)
-        # LocalExecutor.import_bundle() doesn't need server_config
-        # RemoteKMigratorExecutor.import_bundle() needs server_config
-        if hasattr(executor, 'storage'):  # Remote executor
-            executor.import_bundle(import_script, target_url, bundle, flags, i18n_mode, refdata_mode, target_server_config)
-        else:  # Local executor
-            executor.import_bundle(import_script, target_url, bundle, flags, i18n_mode, refdata_mode)
+        # Pass server_config for credential resolution
+        executor.import_bundle(import_script, target_url, bundle, flags, i18n_mode, refdata_mode, target_server_config)
 
     print(f"\n✓ Imported {len(bundles)} bundles for {deployment_type}")
     print("=" * 60)

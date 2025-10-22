@@ -12,7 +12,7 @@ class BaseExecutor:
     Different implementations support local execution (mock) and remote execution (production).
     """
 
-    def extract(self, script_path, url, entity_id, reference_code=None):
+    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
         """
         Extract entity from PPM server.
 
@@ -21,13 +21,14 @@ class BaseExecutor:
             url: PPM server URL
             entity_id: Entity ID to extract
             reference_code: Optional reference code for specific entity
+            server_config: Optional server configuration dict (for credential resolution)
 
         Returns:
             Local file path (LocalExecutor) or S3 metadata dict (RemoteKMigratorExecutor)
         """
         raise NotImplementedError("Subclasses must implement extract()")
 
-    def import_bundle(self, script_path, url, bundle_metadata, flags, i18n, refdata):
+    def import_bundle(self, script_path, url, bundle_metadata, flags, i18n, refdata, server_config=None):
         """
         Import bundle to PPM server.
 
@@ -38,6 +39,7 @@ class BaseExecutor:
             flags: 25-character kMigrator flag string
             i18n: i18n mode (e.g., 'charset', 'none')
             refdata: Reference data mode (e.g., 'nochange')
+            server_config: Optional server configuration dict (for credential resolution)
 
         Returns:
             None (prints output)

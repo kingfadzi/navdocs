@@ -85,17 +85,31 @@ def get_flag_string(profile_name):
     return result.stdout.strip()
 
 
-def get_credentials():
+def get_credentials(server_config=None):
     """
     Get PPM service account credentials from environment.
-    Returns tuple (username, password) or exits if not found.
+
+    Args:
+        server_config: Optional server configuration dict with ssh_username_env and ssh_password_env
+
+    Returns:
+        Tuple of (username, password) or exits if not found.
     """
-    username = os.environ.get('PPM_SERVICE_ACCOUNT_USER')
-    password = os.environ.get('PPM_SERVICE_ACCOUNT_PASSWORD')
+    # Get credential env var names from server config with defaults
+    if server_config:
+        username_env = server_config.get('ssh_username_env', 'PPM_SERVICE_ACCOUNT_USER')
+        password_env = server_config.get('ssh_password_env', 'PPM_SERVICE_ACCOUNT_PASSWORD')
+    else:
+        username_env = 'PPM_SERVICE_ACCOUNT_USER'
+        password_env = 'PPM_SERVICE_ACCOUNT_PASSWORD'
+
+    # Read credentials from configured env vars
+    username = os.environ.get(username_env)
+    password = os.environ.get(password_env)
 
     if not username or not password:
         print("ERROR: PPM credentials not set")
-        print("  Required: PPM_SERVICE_ACCOUNT_USER and PPM_SERVICE_ACCOUNT_PASSWORD")
+        print(f"  Required: {username_env} and {password_env}")
         sys.exit(1)
 
     print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")

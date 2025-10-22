@@ -120,12 +120,8 @@ def execute_rollback_from_archive(archive_path, target_url, import_script, targe
     executor = get_executor(config, target_server_config)
 
     for bundle in bundle_files:
-        # LocalExecutor.import_bundle() doesn't need server_config
-        # RemoteKMigratorExecutor.import_bundle() needs server_config
-        if hasattr(executor, 'storage'):  # Remote executor
-            executor.import_bundle(import_script, target_url, str(bundle), flags, 'charset', 'nochange', target_server_config)
-        else:  # Local executor
-            executor.import_bundle(import_script, target_url, str(bundle), flags, 'charset', 'nochange')
+        # Pass server_config for credential resolution
+        executor.import_bundle(import_script, target_url, str(bundle), flags, 'charset', 'nochange', target_server_config)
 
     print("\nCleaning up temporary files...")
     shutil.rmtree(extract_dir.parent)

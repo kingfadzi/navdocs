@@ -37,7 +37,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
         self.storage = storage
         self.ssh = ssh_executor if ssh_executor else RemoteExecutor()
 
-    def extract(self, script_path, url, entity_id, reference_code, server_config):
+    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
         """
         Extract entity remotely and upload to storage.
 
@@ -45,13 +45,13 @@ class RemoteKMigratorExecutor(BaseExecutor):
             script_path: Path to kMigrator extract script on remote server
             url: PPM server URL
             entity_id: Entity ID to extract
-            reference_code: Reference code for specific entity (required for remote)
-            server_config: Server configuration dict with ssh_host
+            reference_code: Reference code for specific entity (optional)
+            server_config: Server configuration dict with ssh_host (required for remote)
 
         Returns:
             S3 metadata dict with bundle_filename, s3_key, s3_bucket
         """
-        username, password = get_credentials()
+        username, password = get_credentials(server_config)
 
         # Generate bundle filename
         pipeline_id = os.environ.get('CI_PIPELINE_ID', 'local')
@@ -109,7 +109,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
             self.ssh.ssh_exec(server_config, f"rm -rf {remote_bundle_dir}")
             raise
 
-    def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config):
+    def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config=None):
         """
         Import bundle from local file (GitLab artifact) to remote server.
 
@@ -120,12 +120,12 @@ class RemoteKMigratorExecutor(BaseExecutor):
             flags: 25-character kMigrator flag string
             i18n: i18n mode (e.g., 'charset', 'none')
             refdata: Reference data mode (e.g., 'nochange')
-            server_config: Server configuration dict with ssh_host
+            server_config: Server configuration dict with ssh_host (required for remote)
 
         Returns:
             None (prints output)
         """
-        username, password = get_credentials()
+        username, password = get_credentials(server_config)
 
         # Get bundle filename from local path
         from pathlib import Path
