@@ -25,6 +25,14 @@ class StorageBackend:
         """Get metadata about stored bundle."""
         raise NotImplementedError
 
+    def upload_file(self, local_path, storage_key):
+        """Upload local file to storage (for archives)."""
+        raise NotImplementedError
+
+    def download_file(self, storage_key, local_path):
+        """Download file from storage to local path (for rollback)."""
+        raise NotImplementedError
+
 
 class LocalStorage(StorageBackend):
     """Local storage backend for mock/development mode."""
@@ -59,6 +67,14 @@ class LocalStorage(StorageBackend):
                 'exists': True
             }
         return {'exists': False}
+
+    def upload_file(self, local_path, storage_key):
+        """No-op for local mode - file already exists locally."""
+        return str(local_path)
+
+    def download_file(self, storage_key, local_path):
+        """No-op for local mode - file already exists locally."""
+        return str(storage_key)
 
 
 class S3Storage(StorageBackend):
@@ -200,6 +216,33 @@ class S3Storage(StorageBackend):
             if e.response['Error']['Code'] == '404':
                 return {'exists': False}
             raise
+
+    def upload_file(self, local_path, storage_key):
+        """Upload local file directly to S3."""
+        s3_client = self._get_client()
+        s3_url = f"s3://{self.bucket}/{storage_key}"
+        print(f"Uploading to S3: {s3_url}")
+        try:
+            s3_client.upload_file(str(local_path), self.bucket, storage_key)
+            print(f"✓ Uploaded: {s3_url}")
+            return s3_url
+        except Exception as e:
+            print(f"ERROR: S3 upload failed: {e}")
+            sys.exit(1)
+
+    def download_file(self, storage_key, local_path):
+        """Download file from S3 to local path."""
+        s3_client = self._get_client()
+        s3_url = f"s3://{self.bucket}/{storage_key}"
+        Path(local_path).parent.mkdir(parents=True, exist_ok=True)
+        print(f"Downloading from S3: {s3_url}")
+        try:
+            s3_client.download_file(self.bucket, storage_key, str(local_path))
+            print(f"✓ Downloaded to: {local_path}")
+            return str(local_path)
+        except Exception as e:
+            print(f"ERROR: S3 download failed: {e}")
+            sys.exit(1)
 
 
 def get_storage_backend(config):
