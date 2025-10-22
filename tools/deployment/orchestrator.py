@@ -98,7 +98,10 @@ def extract_command(bom_file, deployment_type):
         bundle_dir = root / "bundles"
         bundle_dir.mkdir(exist_ok=True)
 
-        from storage import get_storage_backend
+        try:
+            from storage import get_storage_backend
+        except ImportError:
+            from tools.storage import get_storage_backend
         storage = get_storage_backend(config)
 
         local_bundles = []
