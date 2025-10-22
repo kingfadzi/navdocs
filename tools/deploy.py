@@ -172,14 +172,19 @@ def archive_command(bom_file, deployment_type):
     # Step 2: Create evidence package
     evidence_path = create_evidence_package(metadata['bom_file'], archive_path, config)
 
-    # Step 3: Create complete snapshot and upload to S3
+    # Step 3: Create ROLLBACK_MANIFEST (before S3 upload, so it can be included in snapshot)
+    # Note: s3_snapshot_url will be populated after upload, manifest will be updated
+    create_rollback_manifest(archive_path, storage_mode, metadata, metadata['bom_file'], s3_snapshot_url=None)
+
+    # Step 4: Create complete snapshot and upload to S3 (includes ROLLBACK_MANIFEST)
     s3_snapshot_url = create_complete_snapshot(
         pipeline_id, deployment_type, metadata,
         metadata['bom_file'], archive_path, evidence_path, config
     )
 
-    # Step 4: Create ROLLBACK_MANIFEST with GitLab + S3 paths
-    create_rollback_manifest(archive_path, storage_mode, metadata, metadata['bom_file'], s3_snapshot_url)
+    # Step 5: Update ROLLBACK_MANIFEST with S3 snapshot URL
+    if s3_snapshot_url:
+        create_rollback_manifest(archive_path, storage_mode, metadata, metadata['bom_file'], s3_snapshot_url)
 
     # Step 5: Print rollback info
     print_gitlab_artifact_info(archive_path, metadata['bom_file'], metadata)
