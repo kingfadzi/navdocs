@@ -22,16 +22,16 @@ s3:
   # Credentials from Vault
   vault_roles:
     - name: s3-read
-      path: secret/shared/s3
+      path: secret/data/shared/s3
 
 # PPM Server Registry with SSH configuration for remote execution
 # Credentials injected from GitLab CI/CD environment variables (via Vault):
 #
-# Environment-specific (vault: secret/ppm/{env}/useast):
+# Environment-specific (vault: secret/data/ppm/{env}/useast):
 #   - PPM_SERVICE_ACCOUNT_USER: Service account username (used for both PPM API and SSH)
 #   - PPM_SERVICE_ACCOUNT_PASSWORD: Service account password (used for both PPM API and SSH)
 #
-# Shared across all environments (vault: secret/shared/s3):
+# Shared across all environments (vault: secret/data/shared/s3):
 #   - AWS_ACCESS_KEY_ID: S3/MinIO access key
 #   - AWS_SECRET_ACCESS_KEY: S3/MinIO secret key
 servers:
@@ -42,7 +42,7 @@ servers:
     ssh_host: "ppm-dev-internal.company.com"
     vault_roles:
       - name: ppm-dev
-        path: secret/ppm/dev/useast
+        path: secret/data/ppm/dev/useast
 
   test-ppm-useast:
     url: "https://ppm-test.company.com"
@@ -51,7 +51,7 @@ servers:
     ssh_host: "ppm-test-internal.company.com"
     vault_roles:
       - name: ppm-test
-        path: secret/ppm/test/useast
+        path: secret/data/ppm/test/useast
 
   staging-ppm-useast:
     url: "https://ppm-staging.company.com"
@@ -60,7 +60,7 @@ servers:
     ssh_host: "ppm-staging-internal.company.com"
     vault_roles:
       - name: ppm-staging
-        path: secret/ppm/staging/useast
+        path: secret/data/ppm/staging/useast
 
   prod-ppm-useast:
     url: "https://ppm-prod.company.com"
@@ -69,4 +69,4 @@ servers:
     ssh_host: "ppm-prod-internal.company.com"
     vault_roles:
       - name: ppm-prod
-        path: secret/ppm/prod/useast
+        path: secret/data/ppm/prod/useast
