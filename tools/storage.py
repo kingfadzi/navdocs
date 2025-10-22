@@ -139,43 +139,48 @@ class S3Storage(StorageBackend):
         }
 
     def download_to_server(self, ssh_executor, ssh_config, bundle_metadata, remote_path):
-        """Download bundle from S3/MinIO to remote server."""
-        env = os.environ.copy()
+        """
+        Download bundle from S3 to a remote server by first downloading it to the runner.
+        """
+        s3_client = self._get_client()
+        local_temp_dir = Path('./temp_bundles')
+        local_temp_dir.mkdir(exist_ok=True)
 
         if isinstance(bundle_metadata, dict):
             s3_key = bundle_metadata.get('s3_key')
             s3_bucket = bundle_metadata.get('s3_bucket', self.bucket)
+            bundle_filename = bundle_metadata.get('bundle_filename', Path(s3_key).name)
         else:
             s3_key = bundle_metadata
             s3_bucket = self.bucket
+            bundle_filename = Path(s3_key).name
 
+        local_path = local_temp_dir / bundle_filename
         s3_url = f"s3://{s3_bucket}/{s3_key}"
 
-        aws_cmd = (
-            f"AWS_ACCESS_KEY_ID={os.environ['AWS_ACCESS_KEY_ID']} "
-            f"AWS_SECRET_ACCESS_KEY={os.environ['AWS_SECRET_ACCESS_KEY']} "
-        )
-
-        if self.endpoint_url:
-            aws_cmd += f"AWS_ENDPOINT_URL={self.endpoint_url} "
-
-        aws_cmd += f"aws s3 cp {s3_url} {remote_path} --region {self.region}"
-
+        # Step 1: Download the file from S3 to the local runner
         print(f"Downloading from S3: {s3_url}")
-
         try:
-            stdout, stderr, returncode = ssh_executor.ssh_exec(ssh_config, aws_cmd, env)
-
-            if returncode != 0:
-                print(f"ERROR: S3 download failed: {stderr}")
-                sys.exit(1)
-
-            print(f"✓ Downloaded to: {remote_path}\n")
-            return True
-
+            s3_client.download_file(s3_bucket, s3_key, str(local_path))
+            print(f"✓ Downloaded to local runner: {local_path}")
         except Exception as e:
             print(f"ERROR: S3 download failed: {e}")
             sys.exit(1)
+
+        # Step 2: Upload the local file to the remote server
+        print(f"Uploading to remote server: {remote_path}")
+        try:
+            ssh_executor.scp_upload(ssh_config, str(local_path), remote_path)
+            print(f"✓ Uploaded to: {remote_path}\n")
+        except Exception as e:
+            print(f"ERROR: Failed to upload bundle to remote server: {e}")
+            sys.exit(1)
+        finally:
+            # Clean up the local temporary file
+            if os.path.exists(local_path):
+                os.remove(local_path)
+
+        return True
 
     def get_metadata(self, storage_key):
         """Get S3 object metadata."""
