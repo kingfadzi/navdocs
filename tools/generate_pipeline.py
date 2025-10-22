@@ -10,6 +10,64 @@ def load_yaml(file_path):
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
+
+def get_vault_provider(server_or_s3_config, deployment_config):
+    """
+    Get the vault component provider for a server or S3 configuration.
+
+    Args:
+        server_or_s3_config: Server config dict or S3 config dict
+        deployment_config: Full deployment configuration
+
+    Returns:
+        Provider configuration dict with component_url, component_version, parameter_mappings
+    """
+    # Check for provider override in server/s3 config
+    provider_name = server_or_s3_config.get('vault_component_provider')
+
+    # Fall back to global default
+    if not provider_name:
+        provider_name = deployment_config.get('vault_component_provider', 'standard')
+
+    # Get provider config
+    providers = deployment_config.get('vault_component_providers', {})
+    if provider_name not in providers:
+        print(f"Error: Vault component provider '{provider_name}' not found in vault_component_providers", file=sys.stderr)
+        print(f"Available providers: {list(providers.keys())}", file=sys.stderr)
+        sys.exit(1)
+
+    return providers[provider_name]
+
+
+def generate_component_include(provider, anchor_name, role, secret_paths):
+    """
+    Generate a single vault component include using provider configuration.
+
+    Args:
+        provider: Provider config dict with component_url, component_version, parameter_mappings
+        anchor_name: Anchor name for the component (e.g., 'vault-ppm-dev')
+        role: Vault role name
+        secret_paths: Vault secret path
+
+    Returns:
+        YAML-formatted component include string
+    """
+    component_url = provider['component_url']
+    component_version = provider['component_version']
+    param_mappings = provider['parameter_mappings']
+
+    # Map our internal parameter names to provider's parameter names
+    anchor_param = param_mappings['anchor_name']
+    role_param = param_mappings['role']
+    paths_param = param_mappings['secret_paths']
+
+    return f"""  - component: {component_url}@{component_version}
+    inputs:
+      {anchor_param}: '{anchor_name}'
+      {role_param}: '{role}'
+      {paths_param}: '["{secret_paths}"]'
+"""
+
 def generate_vault_references(vault_configs):
     """
     Generate !reference directives for vault component before_scripts.
@@ -52,33 +110,29 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
         sys.exit(1)
 
     # Find the roles and paths from the deployment config
-    source_role = deployment_config['servers'][source_server_name]['vault_roles'][0]['name']
-    source_path = deployment_config['servers'][source_server_name]['vault_roles'][0]['path']
-    target_role = deployment_config['servers'][target_server_name]['vault_roles'][0]['name']
-    target_path = deployment_config['servers'][target_server_name]['vault_roles'][0]['path']
-    s3_role = deployment_config['s3']['vault_roles'][0]['name']
-    s3_path = deployment_config['s3']['vault_roles'][0]['path']
+    source_server_config = deployment_config['servers'][source_server_name]
+    target_server_config = deployment_config['servers'][target_server_name]
+    s3_config = deployment_config['s3']
 
-    # --- Step 2: Generate Vault Component Includes ---
-    vault_includes = f"""# Vault component includes for dynamic child pipeline
-include:
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
-    inputs:
-      anchor_name: 'vault-{source_role}'
-      vault_role: '{source_role}'
-      vault_secret_paths: '["{source_path}"]'
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
-    inputs:
-      anchor_name: 'vault-{target_role}'
-      vault_role: '{target_role}'
-      vault_secret_paths: '["{target_path}"]'
-  - component: eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve@v1.0.3
-    inputs:
-      anchor_name: 'vault-s3'
-      vault_role: '{s3_role}'
-      vault_secret_paths: '["{s3_path}"]'
+    source_role = source_server_config['vault_roles'][0]['name']
+    source_path = source_server_config['vault_roles'][0]['path']
+    target_role = target_server_config['vault_roles'][0]['name']
+    target_path = target_server_config['vault_roles'][0]['path']
+    s3_role = s3_config['vault_roles'][0]['name']
+    s3_path = s3_config['vault_roles'][0]['path']
 
-"""
+    # --- Step 2: Generate Vault Component Includes (Pluggable Providers) ---
+    # Get vault providers for each component
+    source_provider = get_vault_provider(source_server_config, deployment_config)
+    target_provider = get_vault_provider(target_server_config, deployment_config)
+    s3_provider = get_vault_provider(s3_config, deployment_config)
+
+    # Generate component includes using provider configurations
+    vault_includes = "# Vault component includes for dynamic child pipeline\ninclude:\n"
+    vault_includes += generate_component_include(source_provider, f'vault-{source_role}', source_role, source_path)
+    vault_includes += generate_component_include(target_provider, f'vault-{target_role}', target_role, target_path)
+    vault_includes += generate_component_include(s3_provider, 'vault-s3', s3_role, s3_path)
+    vault_includes += "\n"
 
     # --- Step 3: Generate Vault References for Each Job ---
     # Extract job needs source PPM role + S3
