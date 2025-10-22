@@ -39,7 +39,7 @@ servers:
     url: "https://ppm-dev.company.com"
     env_type: dev
     region: useast
-    ssh_host: "ppm-dev-internal.company.com"
+    ssh_host: "mars"
     vault_roles:
       - name: ppm-dev
         path: secret/data/ppm/dev/useast
@@ -48,7 +48,7 @@ servers:
     url: "https://ppm-test.company.com"
     env_type: test
     region: useast
-    ssh_host: "ppm-test-internal.company.com"
+    ssh_host: "phobos"
     vault_roles:
       - name: ppm-test
         path: secret/data/ppm/test/useast
@@ -57,7 +57,7 @@ servers:
     url: "https://ppm-staging.company.com"
     env_type: staging
     region: useast
-    ssh_host: "ppm-staging-internal.company.com"
+    ssh_host: "cygnus"
     vault_roles:
       - name: ppm-staging
         path: secret/data/ppm/staging/useast
@@ -66,7 +66,7 @@ servers:
     url: "https://ppm-prod.company.com"
     env_type: prod
     region: useast
-    ssh_host: "ppm-prod-internal.company.com"
+    ssh_host: "helios"
     vault_roles:
       - name: ppm-prod
         path: secret/data/ppm/prod/useast
