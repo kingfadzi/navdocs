@@ -1,6 +1,6 @@
 # Functional BOM
 # Deploy SPECIFIC business logic entities (Workflows, Request Types, Reports, Dashboards)
-version: "2.0.30"
+version: "2.0.31"
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
