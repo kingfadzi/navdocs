@@ -350,6 +350,7 @@ def create_evidence_package(bom_file, archive_path, config):
 def archive_deployment(bundles, bom_file, flags, config):
     """
     Create a ZIP archive with bundles + BOM + flags for rollback.
+    Handles both local file paths and S3 metadata dictionaries.
     """
     root = Path(__file__).parent.parent
     archive_dir = root / config['deployment']['archive_dir']
@@ -361,17 +362,44 @@ def archive_deployment(bundles, bom_file, flags, config):
     archive_name = f"{change_request}-v{version}-{timestamp}-bundles.zip"
     archive_path = archive_dir / archive_name
     print(f"Creating deployment archive: {archive_name}")
-    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for bundle in bundles:
-            zipf.write(bundle, arcname=f"bundles/{Path(bundle).name}")
-        zipf.write(bom_file, arcname="bom.yaml")
-        zipf.writestr("flags.txt", flags)
-        manifest = {
-            'version': version, 'change_request': change_request,
-            'archived_at': datetime.now().isoformat(),
-            'bundles': [Path(b).name for b in bundles], 'flags': flags
-        }
-        zipf.writestr("manifest.yaml", yaml.dump(manifest))
+
+    storage = get_storage_backend(config)
+    temp_dir = root / "temp_archive_bundles"
+    temp_dir.mkdir(exist_ok=True)
+    bundle_filenames = []
+
+    try:
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for bundle_meta in bundles:
+                if isinstance(bundle_meta, dict):  # S3 mode
+                    bundle_filename = bundle_meta.get('bundle_filename')
+                    s3_key = bundle_meta.get('s3_key')
+                    s3_bucket = bundle_meta.get('s3_bucket')
+                    local_path = temp_dir / bundle_filename
+                    
+                    print(f"Downloading {s3_key} for archival...")
+                    storage._get_client().download_file(s3_bucket, s3_key, str(local_path))
+                    
+                    zipf.write(local_path, arcname=f"bundles/{bundle_filename}")
+                    bundle_filenames.append(bundle_filename)
+                else:  # Local mode
+                    local_path = bundle_meta
+                    bundle_filename = Path(local_path).name
+                    zipf.write(local_path, arcname=f"bundles/{bundle_filename}")
+                    bundle_filenames.append(bundle_filename)
+
+            zipf.write(bom_file, arcname="bom.yaml")
+            zipf.writestr("flags.txt", flags)
+            manifest = {
+                'version': version, 'change_request': change_request,
+                'archived_at': datetime.now().isoformat(),
+                'bundles': bundle_filenames, 'flags': flags
+            }
+            zipf.writestr("manifest.yaml", yaml.dump(manifest))
+    finally:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+
     print(f"Archive created: {archive_path}")
     return archive_path
 
