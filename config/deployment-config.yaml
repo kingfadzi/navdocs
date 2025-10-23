@@ -80,7 +80,7 @@ servers:
       username: "PPM_SERVICE_ACCOUNT_USER"
       password: "PPM_SERVICE_ACCOUNT_PASSWORD"
     vault_roles:
-      - name: ssh-mars
+      - name: ssh-infra
         path: secret/data/infrastructure/ssh/mars
       - name: ppm-dev
         path: secret/data/ppm/dev/useast
@@ -97,7 +97,7 @@ servers:
       username: "PPM_SERVICE_ACCOUNT_USER"
       password: "PPM_SERVICE_ACCOUNT_PASSWORD"
     vault_roles:
-      - name: ssh-phobos
+      - name: ssh-infra
         path: secret/data/infrastructure/ssh/phobos
       - name: ppm-test
         path: secret/data/ppm/test/useast
@@ -114,7 +114,7 @@ servers:
       username: "PPM_SERVICE_ACCOUNT_USER"
       password: "PPM_SERVICE_ACCOUNT_PASSWORD"
     vault_roles:
-      - name: ssh-cygnus
+      - name: ssh-infra
         path: secret/data/infrastructure/ssh/cygnus
       - name: ppm-staging
         path: secret/data/ppm/staging/useast
@@ -131,7 +131,7 @@ servers:
       username: "PPM_SERVICE_ACCOUNT_USER"
       password: "PPM_SERVICE_ACCOUNT_PASSWORD"
     vault_roles:
-      - name: ssh-helios
+      - name: ssh-infra
         path: secret/data/infrastructure/ssh/helios
       - name: ppm-prod
         path: secret/data/ppm/prod/useast
