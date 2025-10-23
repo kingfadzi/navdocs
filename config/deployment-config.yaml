@@ -19,7 +19,7 @@ vault_component_providers:
   # Standard vault-secret-fetcher component (default)
   standard:
     component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
-    component_version: "v1.0.3"
+    component_version: "v1.0.4"
     parameter_mappings:
       anchor_name: "anchor_name"       # Our internal name → Component's parameter name
       role: "vault_role"               # Our internal name → Component's parameter name
