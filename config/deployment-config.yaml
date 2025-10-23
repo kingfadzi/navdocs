@@ -64,7 +64,7 @@ s3:
 #   - SSH_PASSWORD: Password for SSH authentication
 #
 # PPM credentials (vault: secret/data/ppm/{env}/useast):
-#   - PPM_SERVICE_ACCOUNT_USER: PPM service account username for kMigrator/API operations
+#   - PPM_ADMIN_USER: PPM service account username for kMigrator/API operations
 #   - PPM_SERVICE_ACCOUNT_PASSWORD: PPM service account password
 
 servers:
@@ -77,8 +77,8 @@ servers:
       username: "SSH_USERNAME"
       password: "SSH_PASSWORD"
     ppm_api_env_vars:
-      username: "PPM_SERVICE_ACCOUNT_USER"
-      password: "PPM_SERVICE_ACCOUNT_PASSWORD"
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
       - name: ssh-infra
         path: secret/data/infrastructure/ssh/mars
@@ -94,8 +94,8 @@ servers:
       username: "SSH_USERNAME"
       password: "SSH_PASSWORD"
     ppm_api_env_vars:
-      username: "PPM_SERVICE_ACCOUNT_USER"
-      password: "PPM_SERVICE_ACCOUNT_PASSWORD"
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
       - name: ssh-infra
         path: secret/data/infrastructure/ssh/phobos
@@ -111,8 +111,8 @@ servers:
       username: "SSH_USERNAME"
       password: "SSH_PASSWORD"
     ppm_api_env_vars:
-      username: "PPM_SERVICE_ACCOUNT_USER"
-      password: "PPM_SERVICE_ACCOUNT_PASSWORD"
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
       - name: ssh-infra
         path: secret/data/infrastructure/ssh/cygnus
@@ -128,8 +128,8 @@ servers:
       username: "SSH_USERNAME"
       password: "SSH_PASSWORD"
     ppm_api_env_vars:
-      username: "PPM_SERVICE_ACCOUNT_USER"
-      password: "PPM_SERVICE_ACCOUNT_PASSWORD"
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
       - name: ssh-infra
         path: secret/data/infrastructure/ssh/helios
