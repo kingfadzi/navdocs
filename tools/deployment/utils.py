@@ -94,26 +94,43 @@ def apply_default_credentials(server_config, config):
     Returns:
         Server config with credential env vars populated (in-place modification)
     """
-    # If server doesn't have explicit credential env vars, use defaults
-    if 'ssh_username_env' not in server_config:
-        default_creds = config.get('default_credentials', {})
-        if 'ssh_username_env' in default_creds:
-            server_config['ssh_username_env'] = default_creds['ssh_username_env']
+    default_creds = config.get('default_credentials', {})
 
-    if 'ssh_password_env' not in server_config:
-        default_creds = config.get('default_credentials', {})
-        if 'ssh_password_env' in default_creds:
-            server_config['ssh_password_env'] = default_creds['ssh_password_env']
+    # Ensure ssh_env_vars section exists
+    if 'ssh_env_vars' not in server_config:
+        server_config['ssh_env_vars'] = {}
+
+    # Ensure ppm_api_env_vars section exists
+    if 'ppm_api_env_vars' not in server_config:
+        server_config['ppm_api_env_vars'] = {}
+
+    ssh_vars = server_config['ssh_env_vars']
+    ppm_vars = server_config['ppm_api_env_vars']
+
+    # Apply SSH credential defaults (for remote server access)
+    if 'username' not in ssh_vars and 'ssh_username' in default_creds:
+        ssh_vars['username'] = default_creds['ssh_username']
+
+    if 'password' not in ssh_vars and 'ssh_password' in default_creds:
+        ssh_vars['password'] = default_creds['ssh_password']
+
+    # Apply PPM/kMigrator credential defaults (for PPM API access)
+    if 'username' not in ppm_vars and 'ppm_username' in default_creds:
+        ppm_vars['username'] = default_creds['ppm_username']
+
+    if 'password' not in ppm_vars and 'ppm_password' in default_creds:
+        ppm_vars['password'] = default_creds['ppm_password']
 
     return server_config
 
 
-def get_credentials(server_config=None):
+def get_ppm_credentials(server_config=None):
     """
-    Get PPM service account credentials from environment.
+    Get PPM/kMigrator service account credentials from environment.
+    These credentials are used for PPM API authentication (not SSH).
 
     Args:
-        server_config: Server configuration dict. Must contain ssh_username_env and ssh_password_env.
+        server_config: Server configuration dict with ppm_api_env_vars section.
                       NO DEFAULTS - configuration must be explicit.
 
     Returns:
@@ -121,25 +138,26 @@ def get_credentials(server_config=None):
     """
     # Require explicit configuration - NO implicit defaults
     if not server_config:
-        print("ERROR: server_config must be provided to get_credentials()")
+        print("ERROR: server_config must be provided to get_ppm_credentials()")
         sys.exit(1)
 
-    username_env = server_config.get('ssh_username_env')
-    password_env = server_config.get('ssh_password_env')
+    ppm_vars = server_config.get('ppm_api_env_vars', {})
+    username_env = ppm_vars.get('username')
+    password_env = ppm_vars.get('password')
 
     # Fail fast if credential env vars are not configured
     if not username_env or not password_env:
-        print("ERROR: Credential environment variable names not configured")
-        print("Required in server config: 'ssh_username_env' and 'ssh_password_env'")
+        print("ERROR: PPM credential environment variable names not configured")
+        print("Required in server config:")
+        print("  ppm_api_env_vars:")
+        print("    username: 'PPM_SERVICE_ACCOUNT_USER'")
+        print("    password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
         print("\nAdd to config/deployment-config.yaml:")
         print("  servers:")
         print("    your-server:")
-        print("      ssh_username_env: 'YOUR_USERNAME_ENV'")
-        print("      ssh_password_env: 'YOUR_PASSWORD_ENV'")
-        print("\nOr add default_credentials at top level:")
-        print("  default_credentials:")
-        print("    ssh_username_env: 'PPM_SERVICE_ACCOUNT_USER'")
-        print("    ssh_password_env: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
+        print("      ppm_api_env_vars:")
+        print("        username: 'PPM_SERVICE_ACCOUNT_USER'")
+        print("        password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
         sys.exit(1)
 
     # Read credentials from configured env vars
@@ -147,11 +165,11 @@ def get_credentials(server_config=None):
     password = os.environ.get(password_env)
 
     if not username or not password:
-        print("ERROR: PPM credentials not set")
+        print("ERROR: PPM credentials not set in environment")
         print(f"  Required: {username_env} and {password_env}")
         sys.exit(1)
 
-    print(f"✓ Credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
+    print(f"✓ PPM credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
     return username, password
 
 

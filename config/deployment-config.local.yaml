@@ -11,6 +11,15 @@ kmigrator:
 deployment:
   storage_backend: "local"
 
+# Local mode credential defaults for testing
+# In local/mock mode, SSH is not used (no remote execution)
+# PPM credentials are still required for mock kMigrator scripts
+default_credentials:
+  ssh_username: "SSH_USERNAME"           # Not used in local mode, but defined for consistency
+  ssh_password: "SSH_PASSWORD"           # Not used in local mode, but defined for consistency
+  ppm_username: "PPM_SERVICE_ACCOUNT_USER"   # Used by mock kMigrator scripts
+  ppm_password: "PPM_SERVICE_ACCOUNT_PASSWORD"  # Used by mock kMigrator scripts
+
 # Servers: Remove SSH configuration (local execution mode)
 # Override all servers to remove ssh_host, forcing local execution
 servers:

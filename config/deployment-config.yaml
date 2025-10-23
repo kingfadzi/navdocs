@@ -19,7 +19,7 @@ vault_component_providers:
   # Standard vault-secret-fetcher component (default)
   standard:
     component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
-    component_version: "v1.0.3"
+    component_version: "v1.0.4"
     parameter_mappings:
       anchor_name: "anchor_name"       # Our internal name → Component's parameter name
       role: "vault_role"               # Our internal name → Component's parameter name
@@ -47,21 +47,11 @@ vault_component_providers:
 # Global default vault component provider (can be overridden per server or S3)
 vault_component_provider: "standard"
 
-# Default credential environment variable names
-# These are used for SSH authentication and kMigrator operations
-# Can be overridden per server if vault components export different variable names
-default_credentials:
-  ssh_username_env: "PPM_SERVICE_ACCOUNT_USER"
-  ssh_password_env: "PPM_SERVICE_ACCOUNT_PASSWORD"
-
-# S3/MinIO configuration
 s3:
   bucket_name: "ppm-deployment-bundles"
   region: "us-east-1"
   prefix: "bundles/"
   endpoint_url: "http://phobos:9002"
-  # vault_component_provider: "standard"  # Optional: Override vault provider for S3 (defaults to global)
-  # Credentials from Vault
   vault_roles:
     - name: s3-read
       path: secret/data/shared/s3
@@ -69,20 +59,29 @@ s3:
 # PPM Server Registry with SSH configuration for remote execution
 # Credentials injected from GitLab CI/CD environment variables (via Vault):
 #
-# Environment-specific (vault: secret/data/ppm/{env}/useast):
-#   - PPM_SERVICE_ACCOUNT_USER: Service account username (used for both PPM API and SSH)
-#   - PPM_SERVICE_ACCOUNT_PASSWORD: Service account password (used for both PPM API and SSH)
+# SSH credentials (vault: secret/data/infrastructure/ssh/{server}):
+#   - SSH_USERNAME: OS-level user for SSH/SCP access to remote servers
+#   - SSH_PASSWORD: Password for SSH authentication
 #
-# Shared across all environments (vault: secret/data/shared/s3):
-#   - AWS_ACCESS_KEY_ID: S3/MinIO access key
-#   - AWS_SECRET_ACCESS_KEY: S3/MinIO secret key
+# PPM credentials (vault: secret/data/ppm/{env}/useast):
+#   - PPM_ADMIN_USER: PPM service account username for kMigrator/API operations
+#   - PPM_SERVICE_ACCOUNT_PASSWORD: PPM service account password
+
 servers:
   dev-ppm-useast:
     url: "https://ppm-dev.company.com"
     env_type: dev
     region: useast
     ssh_host: "mars"
+    ssh_env_vars:
+      username: "SSH_USERNAME"
+      password: "SSH_PASSWORD"
+    ppm_api_env_vars:
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
+      - name: ssh-infra
+        path: secret/data/infrastructure/ssh/mars
       - name: ppm-dev
         path: secret/data/ppm/dev/useast
 
@@ -91,7 +90,15 @@ servers:
     env_type: test
     region: useast
     ssh_host: "phobos"
+    ssh_env_vars:
+      username: "SSH_USERNAME"
+      password: "SSH_PASSWORD"
+    ppm_api_env_vars:
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
+      - name: ssh-infra
+        path: secret/data/infrastructure/ssh/phobos
       - name: ppm-test
         path: secret/data/ppm/test/useast
 
@@ -100,7 +107,15 @@ servers:
     env_type: staging
     region: useast
     ssh_host: "cygnus"
+    ssh_env_vars:
+      username: "SSH_USERNAME"
+      password: "SSH_PASSWORD"
+    ppm_api_env_vars:
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
+      - name: ssh-infra
+        path: secret/data/infrastructure/ssh/cygnus
       - name: ppm-staging
         path: secret/data/ppm/staging/useast
 
@@ -109,9 +124,14 @@ servers:
     env_type: prod
     region: useast
     ssh_host: "helios"
-    # vault_component_provider: "csm"  # Optional: Override vault provider for this server (defaults to global)
-    # ssh_username_env: "CSM_USER_ppm_prod"  # Optional: Override credential env var names (defaults to global)
-    # ssh_password_env: "CSM_PASS_ppm_prod"  # Optional: Override credential env var names (defaults to global)
+    ssh_env_vars:
+      username: "SSH_USERNAME"
+      password: "SSH_PASSWORD"
+    ppm_api_env_vars:
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
+      - name: ssh-infra
+        path: secret/data/infrastructure/ssh/helios
       - name: ppm-prod
         path: secret/data/ppm/prod/useast

@@ -67,10 +67,8 @@ def extract_command(bom_file, deployment_type):
     # Get executor for source server
     executor = get_executor(config, source_server_config)
 
-    # Determine storage mode
-    storage_mode = 'local'
-    if hasattr(executor, 'storage'):  # Remote executor has storage attribute
-        storage_mode = config['deployment'].get('storage_backend', 'local')
+    # Determine storage mode (for metadata tracking)
+    storage_mode = config['deployment'].get('storage_backend', 'local')
 
     print(f"Source: {source_server}, Target: {target_server}, Profile: {profile_name}")
     print(f"Storage: {storage_mode.upper()}")
@@ -82,43 +80,16 @@ def extract_command(bom_file, deployment_type):
         print(f"Extracting {len(profile['entities'])} baseline entity types...\n")
         for entity in profile['entities']:
             # Pass server_config for credential resolution
+            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
             bundle = executor.extract(extract_script, source_url, entity['id'], None, source_server_config)
             bundles.append(bundle)
     else:
         print(f"Extracting {len(bom['entities'])} functional entities...\n")
         for entity in bom['entities']:
             # Pass server_config for credential resolution
+            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
             bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'], source_server_config)
             bundles.append(bundle)
-
-    # Download bundles locally for GitLab artifacts (if in S3 mode)
-    # This ensures bundles are available in extract stage artifacts
-    if storage_mode == 's3':
-        print(f"\nDownloading {len(bundles)} bundles locally for GitLab artifacts...")
-        bundle_dir = root / "bundles"
-        bundle_dir.mkdir(exist_ok=True)
-
-        try:
-            from storage import get_storage_backend
-        except ImportError:
-            from tools.storage import get_storage_backend
-        storage = get_storage_backend(config)
-
-        local_bundles = []
-        for bundle_meta in bundles:
-            bundle_filename = bundle_meta['bundle_filename']
-            s3_key = bundle_meta['s3_key']
-            local_path = bundle_dir / bundle_filename
-
-            print(f"  Downloading {bundle_filename}...")
-            storage.download_file(s3_key, local_path)
-            local_bundles.append(str(local_path))
-
-        print(f"✓ Downloaded {len(local_bundles)} bundles for GitLab artifacts")
-        # Update bundles to point to local paths for import/archive stages
-        # But keep S3 metadata in a separate field for reference
-        bundles_s3_metadata = bundles
-        bundles = local_bundles
 
     metadata = {
         'deployment_type': deployment_type,
