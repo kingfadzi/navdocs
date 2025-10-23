@@ -47,14 +47,11 @@ vault_component_providers:
 # Global default vault component provider (can be overridden per server or S3)
 vault_component_provider: "standard"
 
-# S3/MinIO configuration
 s3:
   bucket_name: "ppm-deployment-bundles"
   region: "us-east-1"
   prefix: "bundles/"
   endpoint_url: "http://phobos:9002"
-  # vault_component_provider: "standard"  # Optional: Override vault provider for S3 (defaults to global)
-  # Credentials from Vault
   vault_roles:
     - name: s3-read
       path: secret/data/shared/s3
@@ -133,14 +130,6 @@ servers:
     ppm_api_env_vars:
       username: "PPM_SERVICE_ACCOUNT_USER"
       password: "PPM_SERVICE_ACCOUNT_PASSWORD"
-    # vault_component_provider: "csm"  # Optional: Override vault provider for this server
-    # Example with CSM vault component (different env var names):
-    # ssh_env_vars:
-    #   username: "CSM_SSH_USER_ppm_prod"
-    #   password: "CSM_SSH_PASS_ppm_prod"
-    # ppm_api_env_vars:
-    #   username: "CSM_PPM_USER_ppm_prod"
-    #   password: "CSM_PPM_PASS_ppm_prod"
     vault_roles:
       - name: ssh-helios
         path: secret/data/infrastructure/ssh/helios
