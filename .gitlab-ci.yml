@@ -32,6 +32,9 @@ validate_baseline:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - boms/baseline.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+      changes:
+        - boms/baseline.yaml
 
 validate_functional:
   stage: validate
@@ -39,6 +42,9 @@ validate_functional:
     - python3 -m tools.config.validation --file boms/functional.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - boms/functional.yaml
 
