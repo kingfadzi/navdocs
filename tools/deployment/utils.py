@@ -11,9 +11,9 @@ from pathlib import Path
 
 # Import validate_bom - handle both direct execution and package import
 try:
-    from validate_bom import validate_bom
+    from config.validation import validate_bom
 except ImportError:
-    from tools.validate_bom import validate_bom
+    from tools.config.validation import validate_bom
 
 
 def load_yaml(file_path):
@@ -41,7 +41,7 @@ def load_config():
     - Default: deployment-config.yaml (production mode)
     - DEPLOYMENT_ENV=local: merges deployment-config.local.yaml overrides
     """
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     base_path = root / "config" / "deployment-config.yaml"
     base_config = load_yaml(base_path)
 
@@ -74,12 +74,10 @@ def load_deployment_metadata(metadata_path="bundles/deployment-metadata.yaml"):
 def get_flag_string(profile_name):
     """
     Get compiled flag string from profile.
-    Calls flag_compiler.py and returns the 25-character Y/N string.
+    Calls flag compiler module and returns the 25-character Y/N string.
     """
-    script_dir = Path(__file__).parent
-    compiler = script_dir / "flag_compiler.py"
     result = subprocess.run(
-        ['python3', str(compiler), profile_name],
+        ['python3', '-m', 'tools.config.flags', profile_name],
         capture_output=True, text=True, check=True
     )
     return result.stdout.strip()

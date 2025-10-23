@@ -31,7 +31,7 @@
 /.gitlab-ci.yml @platform-team @ops-team
 
 # Deployment and validation scripts - require platform team
-/tools/deploy.py @platform-team
-/tools/rollback.py @platform-team
-/tools/flag_compiler.py @platform-team
-/tools/validate_bom.py @platform-team
+/tools/deployment/ @platform-team
+/tools/config/ @platform-team
+/tools/storage/ @platform-team
+/tools/executors/ @platform-team

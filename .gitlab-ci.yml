@@ -6,6 +6,13 @@ stages:
   - prepare
   - deploy
 
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+
+
 # Default configuration
 default:
   image: python:3.11-slim
@@ -20,18 +27,24 @@ default:
 validate_baseline:
   stage: validate
   script:
-    - python3 tools/validate_bom.py --file boms/baseline.yaml --branch "$CI_COMMIT_BRANCH"
+    - python3 -m tools.config.validation --file boms/baseline.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/baseline.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - boms/baseline.yaml
 
 validate_functional:
   stage: validate
   script:
-    - python3 tools/validate_bom.py --file boms/functional.yaml --branch "$CI_COMMIT_BRANCH"
+    - python3 -m tools.config.validation --file boms/functional.yaml --branch "$CI_COMMIT_BRANCH"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - boms/functional.yaml
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH =~ /^feature\//'
       changes:
         - boms/functional.yaml
 
@@ -41,7 +54,7 @@ validate_functional:
 .generate_template:
   stage: prepare
   script:
-    - python3 tools/generate_pipeline.py --bom $BOM_FILE > $ARTIFACT_NAME
+    - python3 -m tools.config.pipeline --bom $BOM_FILE > $ARTIFACT_NAME
   artifacts:
     paths:
       - $ARTIFACT_NAME

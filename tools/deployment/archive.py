@@ -13,10 +13,13 @@ from datetime import datetime
 
 # Import utilities - handle both direct execution and package import
 try:
-    from deploy_utils import load_yaml
+    from deployment.utils import load_yaml
+except ImportError:
+    from tools.deployment.utils import load_yaml
+
+try:
     from storage import get_storage_backend
 except ImportError:
-    from tools.deploy_utils import load_yaml
     from tools.storage import get_storage_backend
 
 
@@ -24,7 +27,7 @@ def create_evidence_package(bom_file, archive_path, config):
     """
     Create evidence package for compliance/audit.
     """
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     evidence_dir = root / "evidence"
     evidence_dir.mkdir(exist_ok=True)
     bom = load_yaml(bom_file)
@@ -56,7 +59,7 @@ def archive_deployment(bundles, bom_file, flags, config):
     Create a ZIP archive with bundles + BOM + flags for rollback.
     Bundles are always local file paths (from GitLab artifacts).
     """
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     archive_dir = root / config['deployment']['archive_dir']
     archive_dir.mkdir(exist_ok=True)
     bom = load_yaml(bom_file)
@@ -122,7 +125,7 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
 
     Uploads to: s3://bucket/snapshots/{pipeline_id}/
     """
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     snapshot_dir = root / "snapshot-temp" / str(pipeline_id)
 
     if snapshot_dir.exists():
@@ -251,7 +254,7 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
 
 def create_rollback_manifest(archive_location, storage_mode, metadata, bom_file, s3_snapshot_url=None):
     """Create ROLLBACK_MANIFEST.yaml with GitLab + S3 paths."""
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     archive_dir = root / "archives"
     archive_dir.mkdir(exist_ok=True)
     manifest_path = archive_dir / "ROLLBACK_MANIFEST.yaml"

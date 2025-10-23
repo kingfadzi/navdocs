@@ -96,7 +96,7 @@ def main():
 
     # Get paths
     script_dir = Path(__file__).parent
-    root_dir = script_dir.parent
+    root_dir = script_dir.parent.parent
 
     schema_file = root_dir / "profiles" / "ppm-flag-schema.yaml"
     profile_file = root_dir / "profiles" / f"{profile_name}.yaml"

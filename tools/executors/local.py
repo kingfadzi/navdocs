@@ -10,10 +10,13 @@ import os
 # Import utilities - handle both direct execution and package import
 try:
     from executors.base import BaseExecutor
-    from deploy_utils import get_credentials
 except ImportError:
     from tools.executors.base import BaseExecutor
-    from tools.deploy_utils import get_credentials
+
+try:
+    from deployment.utils import get_credentials
+except ImportError:
+    from tools.deployment.utils import get_credentials
 
 
 class LocalExecutor(BaseExecutor):
