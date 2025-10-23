@@ -132,36 +132,45 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     for role_config in source_vault_roles:
         role_name = role_config['name']
         role_path = role_config['path']
-        vault_includes += generate_component_include(source_provider, f'vault-{role_name}', role_name, role_path)
+        # Extract unique identifier from path (e.g., "mars" from "secret/data/infrastructure/ssh/mars")
+        path_suffix = role_path.split('/')[-1]
+        unique_anchor = f'vault-{role_name}-{path_suffix}'
+        vault_includes += generate_component_include(source_provider, unique_anchor, role_name, role_path)
 
     # Include ALL target server vault roles (SSH + PPM credentials)
     for role_config in target_vault_roles:
         role_name = role_config['name']
         role_path = role_config['path']
-        vault_includes += generate_component_include(target_provider, f'vault-{role_name}', role_name, role_path)
+        # Extract unique identifier from path (e.g., "phobos" from "secret/data/infrastructure/ssh/phobos")
+        path_suffix = role_path.split('/')[-1]
+        unique_anchor = f'vault-{role_name}-{path_suffix}'
+        vault_includes += generate_component_include(target_provider, unique_anchor, role_name, role_path)
 
     # Include S3 vault roles
     for role_config in s3_vault_roles:
         role_name = role_config['name']
         role_path = role_config['path']
-        vault_includes += generate_component_include(s3_provider, 'vault-s3', role_name, role_path)
+        # Extract unique identifier from path (e.g., "s3" from "secret/data/shared/s3")
+        path_suffix = role_path.split('/')[-1]
+        unique_anchor = f'vault-{role_name}-{path_suffix}'
+        vault_includes += generate_component_include(s3_provider, unique_anchor, role_name, role_path)
 
     vault_includes += "\n"
 
     # --- Step 3: Generate Vault References for Each Job ---
     # Extract job needs ALL source server roles + S3
-    extract_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}") for r in source_vault_roles]
-    extract_vault_configs.extend([(r['name'], r['path'], 'vault-s3') for r in s3_vault_roles])
+    extract_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in source_vault_roles]
+    extract_vault_configs.extend([(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in s3_vault_roles])
     extract_vault_refs = generate_vault_references(extract_vault_configs)
 
     # Import job needs ALL target server roles + S3
-    import_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}") for r in target_vault_roles]
-    import_vault_configs.extend([(r['name'], r['path'], 'vault-s3') for r in s3_vault_roles])
+    import_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in target_vault_roles]
+    import_vault_configs.extend([(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in s3_vault_roles])
     import_vault_refs = generate_vault_references(import_vault_configs)
 
     # Archive job needs ALL target server roles + S3
-    archive_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}") for r in target_vault_roles]
-    archive_vault_configs.extend([(r['name'], r['path'], 'vault-s3') for r in s3_vault_roles])
+    archive_vault_configs = [(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in target_vault_roles]
+    archive_vault_configs.extend([(r['name'], r['path'], f"vault-{r['name']}-{r['path'].split('/')[-1]}") for r in s3_vault_roles])
     archive_vault_refs = generate_vault_references(archive_vault_configs)
 
     # --- Step 4: Populate the Template ---
