@@ -3,6 +3,7 @@
 # Uses !reference to explicitly call vault component before_scripts.
 
 stages:
+  - verify
   - extract
   - import
   - archive
@@ -16,6 +17,63 @@ stages:
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
     - pip3.11 install PyYAML boto3 --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+# JWT Verification Job - Decode and display token claims
+verify_jwt_audience:
+  stage: verify
+  image: almalinux:8
+  before_script:
+    - dnf install -y -q jq coreutils
+  script:
+    - echo "=========================================="
+    - echo "JWT TOKEN VERIFICATION"
+    - echo "=========================================="
+    - echo ""
+    - echo "Checking CI_JOB_JWT_V2 token..."
+    - |
+      if [ -n "$CI_JOB_JWT_V2" ]; then
+        echo "✓ CI_JOB_JWT_V2 is set"
+        echo ""
+        echo "--- JWT Header ---"
+        echo $CI_JOB_JWT_V2 | cut -d. -f1 | base64 -d 2>/dev/null | jq . || echo "Failed to decode header"
+        echo ""
+        echo "--- JWT Payload ---"
+        echo $CI_JOB_JWT_V2 | cut -d. -f2 | base64 -d 2>/dev/null | jq . || echo "Failed to decode payload"
+        echo ""
+        echo "--- CRITICAL: Audience Claim (aud) ---"
+        AUD=$(echo $CI_JOB_JWT_V2 | cut -d. -f2 | base64 -d 2>/dev/null | jq -r '.aud // empty')
+        echo "aud = \"$AUD\""
+        echo ""
+        echo "--- Other Important Claims ---"
+        echo $CI_JOB_JWT_V2 | cut -d. -f2 | base64 -d 2>/dev/null | jq '{iss, sub, namespace_path, project_path, ref, ref_type}' || echo "Failed to extract claims"
+      else
+        echo "✗ CI_JOB_JWT_V2 is not set"
+      fi
+    - echo ""
+    - echo "Checking CI_JOB_JWT token (legacy)..."
+    - |
+      if [ -n "$CI_JOB_JWT" ]; then
+        echo "✓ CI_JOB_JWT is set"
+        echo ""
+        echo "--- Audience Claim (aud) ---"
+        AUD=$(echo $CI_JOB_JWT | cut -d. -f2 | base64 -d 2>/dev/null | jq -r '.aud // empty')
+        echo "aud = \"$AUD\""
+      else
+        echo "✗ CI_JOB_JWT is not set"
+      fi
+    - echo ""
+    - echo "=========================================="
+    - echo "ACTION REQUIRED:"
+    - echo "Update Vault role 'ssh-infra' with:"
+    - echo "  vault write auth/jwt/role/ssh-infra \\"
+    - echo "    bound_audiences=\"$AUD\" \\"
+    - echo "    policies=\"infrastructure-ssh-read\" \\"
+    - echo "    ttl=\"10m\" \\"
+    - echo "    max_ttl=\"30m\" \\"
+    - echo "    user_claim=\"user_email\" \\"
+    - echo "    role_type=\"jwt\""
+    - echo "=========================================="
+  allow_failure: true  # Don't block deployment if verification fails
 
 extract:
   extends: [.job_base]
