@@ -42,7 +42,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
 
     def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
         """
-        Extract entity remotely and upload to storage.
+        Extract entity remotely and download to local bundles/ directory.
 
         Args:
             script_path: Path to kMigrator extract script on remote server
@@ -52,7 +52,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
             server_config: Server configuration dict with ssh_host (required for remote)
 
         Returns:
-            S3 metadata dict with bundle_filename, s3_key, s3_bucket
+            Local file path to extracted bundle (for GitLab artifacts)
         """
         username, password = get_credentials(server_config)
 
@@ -67,11 +67,16 @@ class RemoteKMigratorExecutor(BaseExecutor):
 
         remote_bundle_dir = f"/tmp/ppm-bundles-{pipeline_id}"
         remote_bundle_file = f"{remote_bundle_dir}/{bundle_filename}"
-        storage_key = f"bundles/{pipeline_id}/{bundle_filename}"
+
+        # Local bundles directory (for GitLab artifacts)
+        from pathlib import Path
+        local_bundle_dir = Path("./bundles")
+        local_bundle_dir.mkdir(exist_ok=True)
+        local_bundle_file = local_bundle_dir / bundle_filename
 
         ssh_host = server_config['ssh_host']
 
-        print(f"Extracting entity {entity_id}" + (f" ({reference_code})" if reference_code else " (ALL)") + f" from {url} (REMOTE → S3)")
+        print(f"Extracting entity {entity_id}" + (f" ({reference_code})" if reference_code else " (ALL)") + f" from {url} (REMOTE → LOCAL)")
         print(f"Remote: {username}@{ssh_host}")
 
         try:
@@ -96,15 +101,15 @@ class RemoteKMigratorExecutor(BaseExecutor):
 
             print(stdout)
 
-            # Step 3: Upload to storage
-            bundle_metadata = self.storage.upload_from_server(
-                self.ssh, server_config, remote_bundle_file, storage_key
-            )
+            # Step 3: Download bundle from remote server to local (for GitLab artifacts)
+            print(f"Downloading bundle to local: {local_bundle_file}")
+            self.ssh.scp_download(server_config, remote_bundle_file, str(local_bundle_file))
+            print(f"✓ Downloaded: {local_bundle_file}\n")
 
             # Step 4: Cleanup remote directory
             self.ssh.ssh_exec(server_config, f"rm -rf {remote_bundle_dir}")
 
-            return bundle_metadata
+            return str(local_bundle_file)
 
         except Exception as e:
             print(f"ERROR: Remote extraction failed: {e}")
