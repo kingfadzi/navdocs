@@ -15,9 +15,9 @@ except ImportError:
     from tools.executors.ssh import RemoteExecutor
 
 try:
-    from deployment.utils import get_credentials
+    from deployment.utils import get_ppm_credentials
 except ImportError:
-    from tools.deployment.utils import get_credentials
+    from tools.deployment.utils import get_ppm_credentials
 
 
 class RemoteKMigratorExecutor(BaseExecutor):
@@ -54,7 +54,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
         Returns:
             Local file path to extracted bundle (for GitLab artifacts)
         """
-        username, password = get_credentials(server_config)
+        username, password = get_ppm_credentials(server_config)
 
         # Generate bundle filename
         pipeline_id = os.environ.get('CI_PIPELINE_ID', 'local')
@@ -133,7 +133,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
         Returns:
             None (prints output)
         """
-        username, password = get_credentials(server_config)
+        username, password = get_ppm_credentials(server_config)
 
         # Get bundle filename from local path
         from pathlib import Path

@@ -16,26 +16,30 @@ class RemoteExecutor:
         Get SSH credentials from environment variables.
 
         Args:
-            ssh_config: Server configuration dict (may contain ssh_username_env, ssh_password_env)
+            ssh_config: Server configuration dict with ssh_env_vars section
 
         Returns:
             Tuple of (username, password, username_env_name, password_env_name)
         """
         # Get credential env var names from config (NO DEFAULTS - must be explicit)
-        username_env = ssh_config.get('ssh_username_env')
-        password_env = ssh_config.get('ssh_password_env')
+        ssh_vars = ssh_config.get('ssh_env_vars', {})
+        username_env = ssh_vars.get('username')
+        password_env = ssh_vars.get('password')
 
         # Fail fast if credential env vars are not configured
         if not username_env or not password_env:
             raise ValueError(
-                "ERROR: Credential environment variable names not configured.\n"
-                "Required in server config: 'ssh_username_env' and 'ssh_password_env'\n"
+                "ERROR: SSH credential environment variable names not configured.\n"
+                "Required in server config:\n"
+                "  ssh_env_vars:\n"
+                "    username: 'SSH_USERNAME'\n"
+                "    password: 'SSH_PASSWORD'\n"
                 "Add to config/deployment-config.yaml:\n"
                 "  servers:\n"
                 "    your-server:\n"
-                "      ssh_username_env: 'YOUR_USERNAME_ENV'\n"
-                "      ssh_password_env: 'YOUR_PASSWORD_ENV'\n"
-                "Or set default_credentials at top level."
+                "      ssh_env_vars:\n"
+                "        username: 'YOUR_SSH_USERNAME_ENV'\n"
+                "        password: 'YOUR_SSH_PASSWORD_ENV'"
             )
 
         # Read credentials from configured env vars

@@ -14,9 +14,9 @@ except ImportError:
     from tools.executors.base import BaseExecutor
 
 try:
-    from deployment.utils import get_credentials
+    from deployment.utils import get_ppm_credentials
 except ImportError:
-    from tools.deployment.utils import get_credentials
+    from tools.deployment.utils import get_ppm_credentials
 
 
 class LocalExecutor(BaseExecutor):
@@ -41,7 +41,7 @@ class LocalExecutor(BaseExecutor):
         Returns:
             Local file path to extracted bundle
         """
-        username, password = get_credentials(server_config)
+        username, password = get_ppm_credentials(server_config)
 
         cmd = [
             'bash', script_path, '-username', username, '-password', password,
@@ -82,7 +82,7 @@ class LocalExecutor(BaseExecutor):
         Returns:
             None (prints output)
         """
-        username, password = get_credentials(server_config)
+        username, password = get_ppm_credentials(server_config)
 
         cmd = [
             'bash', script_path, '-username', username, '-password', password,
