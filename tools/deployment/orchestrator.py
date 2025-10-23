@@ -17,7 +17,8 @@ try:
         load_yaml, load_config,
         save_deployment_metadata, load_deployment_metadata,
         get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials
+        get_vault_config_command, apply_default_credentials,
+        get_ppm_credentials
     )
     from deployment.archive import (
         archive_deployment, create_evidence_package,
@@ -30,7 +31,8 @@ except ImportError:
         load_yaml, load_config,
         save_deployment_metadata, load_deployment_metadata,
         get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials
+        get_vault_config_command, apply_default_credentials,
+        get_ppm_credentials
     )
     from tools.deployment.archive import (
         archive_deployment, create_evidence_package,
@@ -192,6 +194,69 @@ def archive_command(bom_file, deployment_type):
     print("=" * 60)
 
 
+def validate_command(bom_file):
+    """Validate BOM and check environment is ready for deployment."""
+    print("=" * 60)
+    print("VALIDATING DEPLOYMENT PREREQUISITES")
+    print("=" * 60)
+    print()
+
+    # 1. Validate BOM file
+    print("[1/3] Validating BOM file...")
+    validate_bom_before_action(bom_file)
+    print()
+
+    # 2. Check servers exist in config
+    print("[2/3] Checking server configuration...")
+    bom = load_yaml(bom_file)
+    config = load_config()
+
+    source = bom['source_server']
+    target = bom['target_server']
+
+    if source not in config['servers']:
+        print(f"✗ ERROR: Source server '{source}' not found in configuration")
+        sys.exit(1)
+    print(f"  ✓ Source server '{source}' found")
+
+    if target not in config['servers']:
+        print(f"✗ ERROR: Target server '{target}' not found in configuration")
+        sys.exit(1)
+    print(f"  ✓ Target server '{target}' found")
+    print()
+
+    # 3. Check required credentials are set
+    print("[3/3] Checking credentials...")
+    source_config = config['servers'][source]
+    target_config = config['servers'][target]
+    apply_default_credentials(source_config, config)
+    apply_default_credentials(target_config, config)
+
+    # Check source server credentials
+    print(f"  Checking source server ({source})...")
+    try:
+        get_ppm_credentials(source_config)
+    except SystemExit:
+        print(f"✗ Source server credentials check failed")
+        sys.exit(1)
+
+    # Check target server credentials
+    print(f"  Checking target server ({target})...")
+    try:
+        get_ppm_credentials(target_config)
+    except SystemExit:
+        print(f"✗ Target server credentials check failed")
+        sys.exit(1)
+
+    print()
+    print("=" * 60)
+    print("✓ ALL VALIDATION CHECKS PASSED")
+    print("=" * 60)
+    print()
+    print(f"Ready to deploy from {source} to {target}")
+    print(f"Run: python3 -m tools.deployment.orchestrator deploy --type {bom.get('profile', 'unknown')} --bom {bom_file}")
+
+
 def deploy_command(bom_file, deployment_type):
     """
     One-shot deployment that runs the full extract -> import -> archive sequence.
@@ -241,7 +306,7 @@ Examples:
   deploy.py get-vault-config --server dev-ppm-useast
         """
     )
-    parser.add_argument('command', choices=['extract', 'import', 'archive', 'rollback', 'deploy', 'get-vault-config'], help='Deployment command')
+    parser.add_argument('command', choices=['extract', 'import', 'archive', 'rollback', 'deploy', 'get-vault-config', 'validate'], help='Deployment command')
     parser.add_argument('--bom', help='BOM file path (e.g., boms/baseline.yaml or boms/functional.yaml)')
     parser.add_argument('--type', choices=['baseline', 'functional'], help="Deployment type")
     parser.add_argument('--server', help='Server name (e.g., dev-ppm-useast)')
@@ -253,6 +318,10 @@ Examples:
             parser.error(f"{args.command} requires --bom argument")
         if not args.type:
             parser.error(f"{args.command} requires --type argument (baseline or functional)")
+
+    if args.command == 'validate':
+        if not args.bom:
+            parser.error("validate requires --bom argument")
 
     if args.command == 'get-vault-config':
         if not args.server:
@@ -271,6 +340,8 @@ Examples:
         rollback.rollback(args.bom, args.type)
     elif args.command == 'get-vault-config':
         get_vault_config_command(args.server)
+    elif args.command == 'validate':
+        validate_command(args.bom)
 
 
 if __name__ == '__main__':

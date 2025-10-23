@@ -147,8 +147,10 @@ def get_ppm_credentials(server_config=None):
 
     # Fail fast if credential env vars are not configured
     if not username_env or not password_env:
+        print("=" * 60)
         print("ERROR: PPM credential environment variable names not configured")
-        print("Required in server config:")
+        print("=" * 60)
+        print("\nRequired in server config:")
         print("  ppm_api_env_vars:")
         print("    username: 'PPM_SERVICE_ACCOUNT_USER'")
         print("    password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
@@ -158,6 +160,7 @@ def get_ppm_credentials(server_config=None):
         print("      ppm_api_env_vars:")
         print("        username: 'PPM_SERVICE_ACCOUNT_USER'")
         print("        password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
+        print("=" * 60)
         sys.exit(1)
 
     # Read credentials from configured env vars
@@ -165,8 +168,20 @@ def get_ppm_credentials(server_config=None):
     password = os.environ.get(password_env)
 
     if not username or not password:
+        print("=" * 60)
         print("ERROR: PPM credentials not set in environment")
-        print(f"  Required: {username_env} and {password_env}")
+        print("=" * 60)
+        print(f"\nRequired environment variables:")
+        print(f"  {username_env}")
+        print(f"  {password_env}")
+        print(f"\nSet them with:")
+        print(f"  export {username_env}='your_ppm_username'")
+        print(f"  export {password_env}='your_ppm_password'")
+        print(f"\nOr add to ~/.bashrc or create a credentials file:")
+        print(f"  echo 'export {username_env}=your_username' >> ~/.ppm_credentials")
+        print(f"  echo 'export {password_env}=your_password' >> ~/.ppm_credentials")
+        print(f"  source ~/.ppm_credentials")
+        print("=" * 60)
         sys.exit(1)
 
     print(f"✓ PPM credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
