@@ -70,25 +70,23 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 
 ## Repository Structure
 
-```
-.
-├── boms/
-│   ├── baseline.yaml              # Baseline deployment BOM
-│   └── functional.yaml            # Functional deployment BOM
-├── config/
-│   ├── deployment-config.yaml     # Server/storage config
-│   └── rules.yaml                 # Governance rules
-├── profiles/
-│   ├── baseline.yaml              # Baseline flags (HOW to deploy)
-│   └── functional-cd.yaml         # Functional flags (HOW to deploy)
-├── schemas/
-│   ├── bom-baseline-schema.json   # Baseline BOM validation schema
-│   ├── bom-functional-schema.json # Functional BOM validation schema
-│   └── entity-types.yaml          # Entity type reference
-├── tools/                         # Python deployment system
-├── templates/                     # CI/CD templates
-└── .gitlab-ci.yml                 # Main pipeline
-```
+- **boms/** - Bill of Materials (WHAT to deploy)
+  - `baseline.yaml` - Baseline deployment BOM
+  - `functional.yaml` - Functional deployment BOM
+- **config/** - Configuration files
+  - `deployment-config.yaml` - Server/storage config
+  - `rules.yaml` - Governance rules
+- **profiles/** - Deployment profiles (HOW to deploy)
+  - `baseline.yaml` - Baseline flags configuration
+  - `functional-cd.yaml` - Functional flags configuration
+- **schemas/** - BOM validation schemas
+  - `bom-baseline-schema.json` - Baseline BOM validation schema
+  - `bom-functional-schema.json` - Functional BOM validation schema
+  - `entity-types.yaml` - Entity type reference
+  - `README.md` - Schema documentation
+- **tools/** - Python deployment system
+- **templates/** - CI/CD pipeline templates
+- `.gitlab-ci.yml` - Main pipeline configuration
 
 ---
 

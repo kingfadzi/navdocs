@@ -129,6 +129,57 @@ python3 -m tools.config.flags functional-cd
 - Self-documenting (each flag has descriptive name)
 - Prevents typos in 25-character strings
 
+### Schema Validation
+
+**Purpose:** Validate BOM structure before deployment starts.
+
+**What it validates:**
+- BOM structure (required fields, data types)
+- Category matches profile (baseline vs functional)
+- Entity IDs are valid for the category
+- Reference codes follow naming convention (UPPERCASE_UNDERSCORE)
+- Entities list is not empty
+
+**How it works:**
+
+1. **BOM loaded** from YAML file
+2. **Category detected** (baseline or functional)
+3. **Schema selected** based on category
+   - Baseline → `schemas/bom-baseline-schema.json`
+   - Functional → `schemas/bom-functional-schema.json`
+4. **Validation runs** using JSON Schema library
+5. **Errors reported** with exact path to problem
+
+**Example validation:**
+```bash
+# Validate BOM manually
+python3 -m tools.config.validation --file boms/functional.yaml
+
+# Output (valid):
+✓ [OK] BOM is valid
+  - Schema validation: PASSED
+  - Governance rules: PASSED
+
+# Output (invalid):
+✗ [FAILED] BOM validation failed
+  - Schema validation failed at 'entities -> 0 -> reference_code':
+    'reference_code' is a required property
+```
+
+**Schema files:**
+- `bom-baseline-schema.json` - Allows entity IDs: 4, 11, 13, 26, 37, 39, 58
+- `bom-functional-schema.json` - Allows entity IDs: 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
+- `entity-types.yaml` - Reference documentation for entity types
+
+**Benefits:**
+- Catches errors BEFORE deployment starts
+- Validates entity IDs match category
+- Enforces mandatory fields (category, referenceCode)
+- Prevents invalid reference code formats
+- Industry-standard JSON Schema format
+
+**See also:** [schemas/README.md](schemas/README.md) for complete validation guide
+
 ### Pipeline
 
 **Main pipeline** (`.gitlab-ci.yml`):
