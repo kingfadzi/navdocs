@@ -186,27 +186,22 @@ See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for actual flag v
 
 ### Standard Flag Profiles
 
-Our deployment system uses two standard flag profiles:
+Our deployment system uses two standard flag profiles defined in `profiles/`:
 
-**Baseline Profile** (`baseline`):
-```
-YYYYYNNNNYYYYYNNNNNNNNN
-```
-- Deploys: Object Types, Request Header Types, Validations, User Data Contexts, Special Commands, Environments, Environment Groups
-- Adds missing: Environments, Security Groups, Request Statuses
-- Does NOT deploy: Workflows, Report Types, Portlets, Dashboard Modules, Dashboard Data Sources, Work Plan Templates, Project Types, Program Types, Portfolio Types, OData Data Sources, Custom Menus, Chatbot Intents, PPM Integration SDK
+**For complete profile details, entity lists, and flag configurations, see:**
+- [Baseline Entities](ENTITY_REFERENCE.md#baseline-entities-infrastructure---7-entities) - Flag string: `YNYYYNNNNYYYNYNNNNNNNNNNNN`
+- [Functional Entities](ENTITY_REFERENCE.md#functional-entities-business-logic---15-entities) - Flag string: `NYNNNYYYYNNNYNYYYYYYYYYYY`
 
-**Functional-CD Profile** (`functional-cd`):
-```
-NYNNNYYYYNNNYNYYYYYYYYYN
-```
-- Deploys: Workflows, Request Types, Report Types, Portlet Definitions, Dashboard Modules, Dashboard Data Sources, Overview Page Sections, Work Plan Templates, Project Types, Program Types, Portfolio Types, OData Data Sources, Custom Menu, Chatbot Intent, PPM Integration SDK
-- Does NOT add missing: Environments, Security Groups, Request Statuses (baseline must already exist)
-- Does NOT deploy: Object Types, Request Header Types, Special Commands, Validations, User Data Contexts, Environment Groups
+**Quick reference:**
+- **Baseline:** Deploys 7 infrastructure entities (Object Types, Validations, Environments, etc.)
+  - Flag string: `YNYYYNNNNYYYNYNNNNNNNNNNNN`
+  - Add missing operations enabled (drift correction)
 
-**Note:** Chatbot Intent (entity 908) is in the deployment list but `replace_chatbot_intents` flag is set to `false`. Verify entity list vs flags in `profiles/functional-cd.yaml`.
+- **Functional-CD:** Deploys 15 business logic entities (Workflows, Reports, Dashboards, etc.)
+  - Flag string: `NYNNNYYYYNNNYNYYYYYYYYYYY`
+  - Add missing operations disabled (strict dependencies)
 
-See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for complete flag configuration.
+See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for source configuration.
 
 ---
 
@@ -216,13 +211,11 @@ Entity IDs are used by kMigratorExtract to identify which entity type to extract
 
 **Official Documentation:** [Entity Type IDs - OpenText PPM](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm)
 
-**Complete entity list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#complete-entity-list-all-22-entities-sorted-by-id)
+**Entity lists:**
+- [Baseline entities (7)](ENTITY_REFERENCE.md#baseline-entities-infrastructure---7-entities) - IDs 4, 11, 13, 26, 37, 39, 58
+- [Functional entities (15)](ENTITY_REFERENCE.md#functional-entities-business-logic---15-entities) - IDs 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
 
-**Quick reference:**
-- **Baseline entities (7):** IDs 4, 11, 13, 26, 37, 39, 58
-- **Functional entities (15):** IDs 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
-
-For detailed descriptions, deployment frequency, and categorization, see the [Entity Reference](docs/ENTITY_REFERENCE.md).
+For detailed descriptions, deployment frequency, and categorization, see the [Entity Reference](ENTITY_REFERENCE.md).
 
 ### Entity Categories
 
@@ -250,50 +243,18 @@ For detailed descriptions, deployment frequency, and categorization, see the [En
 - Must exist in all environments before workflow deployment
 - Controlled by Flag 11 (Add missing Security Group)
 
+**Environment Groups (Entity 58):**
+- Category: Baseline (infrastructure) entity
+- Can be extracted using entity ID 58
+- Imported if explicitly included in migration bundle
+- **Important:** Flag 10 (Add missing Environment) applies to Environments (4) only, NOT Environment Groups (58)
+- If Environment Groups are only referenced but not bundled, migration may partially create headers/metadata (unreliable behavior)
+- **Best practice:** Always extract and bundle both Environments (4) AND Environment Groups (58) together in baseline deployments
+- Functional entities (Request Types, Workflows, etc.) may reference Environment Groups - ensure baseline is deployed first to avoid dependency failures
+
 **OData Data Sources (906):**
 - OData links defined for data sources are NOT migrated
 - Only the data source definition itself is migrated
-
----
-
-## Flag Compilation System
-
-The deployment automation compiles flags from YAML profiles instead of hardcoding 25-character strings.
-
-### Profile Structure
-
-```yaml
-# config/profiles/functional-cd.yaml
-entities:
-  object_types: no          # Flag 1
-  request_types: yes        # Flag 2
-  request_header_types: no  # Flag 3
-  special_commands: no      # Flag 4
-  validations: no           # Flag 5
-  workflows: yes            # Flag 6
-  report_types: yes         # Flag 7
-  # ... 18 more flags
-```
-
-### Flag Compiler
-
-The flag compiler (`tools/config/flags.py`) converts YAML profiles to 25-character strings:
-
-```bash
-# Compile baseline profile
-python3 -m tools.config.flags baseline
-# Output: YNYYYNNNNYYYNYYYYNNNNNNN
-
-# Compile functional-cd profile
-python3 -m tools.config.flags functional-cd
-# Output: NYNNNYYYYNNNYNYYYYYYYYYYN
-```
-
-**Benefits:**
-- Human-readable flag configuration
-- Version-controlled in Git
-- Self-documenting (each flag has descriptive name)
-- Prevents typos in 25-character strings
 
 ---
 
@@ -407,7 +368,6 @@ sh ./kMigratorImport.sh \
 ## References
 
 - **Official kMigrator Documentation:** [OpenText PPM kMigrator Reference](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122150_InstallAdmin_Server.htm)
-- **Deployment Profiles:** `config/profiles/*.yaml`
-- **Flag Compiler:** `tools/config/flags.py`
-- **Entity Migration Guide:** `entity_migration.md`
-- **Key Concepts:** `KEY_CONCEPTS.md`
+- **Deployment Profiles:** `profiles/*.yaml` - See [baseline.yaml](profiles/baseline.yaml) and [functional-cd.yaml](profiles/functional-cd.yaml)
+- **Flag Compilation System:** [KEY_CONCEPTS.md - Profiles and Flag Compilation](KEY_CONCEPTS.md#profiles-and-flag-compilation)
+- **Entity Reference:** [ENTITY_REFERENCE.md](ENTITY_REFERENCE.md)

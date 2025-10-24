@@ -59,22 +59,50 @@ entities:
     description: "Incident workflow"
 ```
 
-### Profiles
+### Profiles and Flag Compilation
 
-**What they do:**
+**What profiles do:**
 - Define which entity types to include
 - Control dependency handling (add missing or require baseline)
 - Compile to 25-character Y/N flag strings for kMigrator
 
 **Two profiles:**
 - `baseline.yaml` - Infrastructure (7 entity types, add_missing=true)
-- `functional-cd.yaml` - Business logic (14 entity types, add_missing=false)
+- `functional-cd.yaml` - Business logic (15 entity types, add_missing=false)
 
-**Flag compilation:**
+**Profile structure:**
+```yaml
+# profiles/functional-cd.yaml
+flags:
+  replace_object_type: false       # Flag 1
+  replace_request_type: true       # Flag 2
+  replace_request_header_type: false  # Flag 3
+  replace_special_command: false   # Flag 4
+  replace_validation: false        # Flag 5
+  replace_workflow: true           # Flag 6
+  replace_report_type: true        # Flag 7
+  # ... 18 more flags
 ```
-baseline.yaml -> YYYYYNNNNYYYYYNNNNNNNNNNN
-functional-cd.yaml -> NYYYYYNYYNNNYYYYYYYYYYN
+
+**Flag compiler:**
+
+The flag compiler (`tools/config/flags.py`) converts YAML profiles to 25-character strings:
+
+```bash
+# Compile baseline profile
+python3 -m tools.config.flags baseline
+# Output: YNYYYNNNNYYYNYNNNNNNNNNNNN
+
+# Compile functional-cd profile
+python3 -m tools.config.flags functional-cd
+# Output: NYNNNYYYYNNNYNYYYYYYYYYYY
 ```
+
+**Benefits:**
+- Human-readable flag configuration
+- Version-controlled in Git
+- Self-documenting (each flag has descriptive name)
+- Prevents typos in 25-character strings
 
 ### Pipeline
 
@@ -105,7 +133,7 @@ tools/
   - remote.py        # SSH + S3
 - storage/          # Storage abstraction
   - local.py         # Filesystem
-  - s3.py            # S3/MinIO
+  - s3.py            # S3
 ```
 
 ---
@@ -118,7 +146,7 @@ tools/
 - Archives: `./archives/` directory
 - Use case: Testing without PPM servers
 
-**S3/MinIO Storage** (production)
+**S3 Storage** (production)
 - Config: `storage_backend: "s3"`
 - Bundles: S3 bucket + GitLab artifacts
 - Archives: S3 (permanent) + GitLab (1 year)
@@ -144,7 +172,7 @@ Archive: Create ZIP -> S3 (permanent) + GitLab artifacts
 **Remote Executor** (production)
 - Triggered: `ssh_host` set AND `storage_backend: "s3"`
 - Scripts: Real kMigrator via SSH
-- Storage: S3/MinIO
+- Storage: S3
 - Use case: Actual deployments
 
 **Auto-selection:**
@@ -161,31 +189,38 @@ else:
 
 ---
 
-## Vault Integration
+## Secret Management
 
-**Secrets from HashiCorp Vault**
-- GitLab CI components fetch from Vault
+**Central Secrets Manager Integration**
+- GitLab CI components fetch secrets automatically
 - Export as environment variables
 - No credentials in code or config
 
-**Per-server vault roles:**
+**Per-server secrets configuration:**
 ```yaml
 servers:
   dev-ppm-useast:
+    ssh_env_vars:
+      username: "SSH_USERNAME"      # Variable name from secrets manager
+      password: "SSH_PASSWORD"
+    ppm_api_env_vars:
+      username: "PPM_ADMIN_USER"
+      password: "PPM_ADMIN_PASSWORD"
     vault_roles:
       - name: ppm-dev
         path: secret/data/ppm/dev/useast
 ```
 
-**Exported variables:**
-- `PPM_ADMIN_USER` / `PPM_ADMIN_PASSWORD` - PPM credentials
-- `SSH_USERNAME` / `SSH_PASSWORD` - SSH credentials
-- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - S3 credentials
+**Variable names are configurable:**
+- Variable names depend on the secrets manager in use
+- Defined in `deployment-config.yaml` per server (`ssh_env_vars`, `ppm_api_env_vars`)
+- Deployment tools read variable names from config, not hardcoded
+- Example above shows one possible configuration
 
 **Pipeline workflow:**
-1. Vault component fetches secrets
-2. Exports as environment variables
-3. Deployment tools read from environment
+1. Secrets manager fetches credentials from configured paths
+2. Exports as environment variables (names defined in config)
+3. Deployment tools read variables specified in config
 4. Secrets cleared after job
 
 ---
@@ -196,7 +231,7 @@ servers:
 
 Must exist before functional deployments.
 
-**Complete list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#baseline-entities-infrastructure---7-entities)
+**Complete list:** See [Entity Reference](ENTITY_REFERENCE.md#baseline-entities-infrastructure---7-entities)
 
 **Baseline entities (7):** Object Types (26), Request Header Types (39), Validations (13), User Data Contexts (37), Special Commands (11), Environments (4), Environment Groups (58)
 
@@ -206,7 +241,7 @@ Must exist before functional deployments.
 
 Deploy frequently once baseline is stable.
 
-**Complete list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#functional-entities-business-logic---15-entities)
+**Complete list:** See [Entity Reference](ENTITY_REFERENCE.md#functional-entities-business-logic---15-entities)
 
 **Functional entities (15):** Workflows (9), Request Types (19), Reports (17), Overview Pages (61), Dashboards (470, 505, 509), Project/Program/Portfolio Types (521, 901, 903), Work Plans (522), OData Sources (906), Custom Menu (907), Chatbot Intents (908), PPM SDK (9900)
 
@@ -302,7 +337,7 @@ deployment_metadata:
 - Real server hostnames
 - S3 storage
 - Real kMigrator paths
-- Vault roles
+- Secrets configuration
 
 **Local override:** `config/deployment-config.local.yaml`
 - `ssh_host: null` (disable SSH)
@@ -361,8 +396,9 @@ export PPM_ADMIN_PASSWORD=testpass
 **Remote mode:**
 ```bash
 # Don't set DEPLOYMENT_ENV
-# All credentials injected by Vault in pipeline
-# For manual CLI: export SSH_USERNAME, SSH_PASSWORD, PPM_ADMIN_USER, etc.
+# All credentials injected by Central Secrets Manager in pipeline
+# For manual CLI: export the variables defined in deployment-config.yaml
+# Example (default config): SSH_USERNAME, SSH_PASSWORD, PPM_ADMIN_USER, PPM_ADMIN_PASSWORD
 ```
 
 See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md) for complete credential setup.

@@ -98,7 +98,8 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 - [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md) - CLI commands, local/remote deployments
 
 **For deep dive:**
-- [KEY_CONCEPTS.md](KEY_CONCEPTS.md) - Architecture, storage, executors, vault
+- [KEY_CONCEPTS.md](KEY_CONCEPTS.md) - Architecture, storage, executors, secrets
+- [ENTITY_REFERENCE.md](ENTITY_REFERENCE.md) - Entity types, profiles, flag configurations
 - [PIPELINE_ARCHITECTURE.md](PIPELINE_ARCHITECTURE.md) - Pipeline execution flow and stages
 - [KMIGRATOR_REFERENCE.md](KMIGRATOR_REFERENCE.md) - kMigrator flags and parameters
 

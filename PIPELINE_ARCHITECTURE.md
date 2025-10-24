@@ -77,7 +77,7 @@ Archive Stage (needs: extract, import)
 
 ---
 
-## Vault Integration
+## Secret Management
 
 Credentials injected per stage via GitLab components.
 
@@ -92,7 +92,7 @@ Credentials injected per stage via GitLab components.
 ### Archive Stage
 - S3 write credentials
 
-**Flow:** Vault component -> Environment variables -> Orchestrator reads -> Job completes -> Credentials cleared
+**Flow:** Secrets component -> Environment variables -> Orchestrator reads -> Job completes -> Credentials cleared
 
 ---
 
@@ -120,15 +120,15 @@ Archive: Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 
 **Input:**
 - BOM file (source_server, target_server, profile)
-- Server vault roles (from deployment-config.yaml)
+- Server secrets configuration (from deployment-config.yaml)
 
 **Output:**
-- Child pipeline YAML with vault components
+- Child pipeline YAML with secrets components
 - Saved as GitLab artifact
 - Triggered by main pipeline
 
 **Why dynamic?**
-- Vault components vary per server
+- Secrets components vary per server
 - BOM content determines deployment type
 - One template, many configurations
 
@@ -153,7 +153,7 @@ Archive: Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 | `.gitlab-ci.yml` | Main pipeline definition | GitLab |
 | `templates/child-pipeline-template.yml` | Child pipeline template | Pipeline generator |
 | `boms/*.yaml` | Trigger changes, define deployments | All stages |
-| `config/deployment-config.yaml` | Server/vault configuration | Orchestrator, generator |
+| `config/deployment-config.yaml` | Server/secrets configuration | Orchestrator, generator |
 | `config/rules.yaml` | Governance rules | Validation |
 | `profiles/*.yaml` | Flag compilation | Orchestrator |
 
@@ -172,7 +172,7 @@ Archive: Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 - Prevents import failures
 
 **Why generate child pipelines?**
-- Vault components vary per server
+- Secrets components vary per server
 - BOM determines deployment parameters
 - Single template, dynamic configuration
 
@@ -192,10 +192,10 @@ Archive: Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 
 **Child pipeline:** `templates/child-pipeline-template.yml`
 - 3 stages: extract -> import -> archive
-- Input: BOM file, vault credentials
+- Input: BOM file, credentials
 - Output: Rollback package (1 year retention)
 
-**Vault:** Per-stage credential injection
+**Secrets:** Per-stage credential injection
 - Extract/Import: SSH + PPM
 - Archive: S3 write
 
