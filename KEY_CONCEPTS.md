@@ -92,20 +92,20 @@ functional-cd.yaml -> NYYYYYNYYNNNYYYYYYYYYYN
 
 ```
 tools/
-├── deployment/       # Core deployment logic
-│   ├── orchestrator.py  # Main entry point
-│   ├── archive.py       # Rollback packages
-│   └── utils.py         # Shared utilities
-├── config/           # Configuration & validation
-│   ├── validation.py    # BOM validator
-│   ├── flags.py         # Flag compiler
-│   └── pipeline.py      # Pipeline generator
-├── executors/        # Execution abstraction
-│   ├── local.py         # Mock mode
-│   └── remote.py        # SSH + S3
-└── storage/          # Storage abstraction
-    ├── local.py         # Filesystem
-    └── s3.py            # S3/MinIO
+- deployment/       # Core deployment logic
+  - orchestrator.py  # Main entry point
+  - archive.py       # Rollback packages
+  - utils.py         # Shared utilities
+- config/           # Configuration & validation
+  - validation.py    # BOM validator
+  - flags.py         # Flag compiler
+  - pipeline.py      # Pipeline generator
+- executors/        # Execution abstraction
+  - local.py         # Mock mode
+  - remote.py        # SSH + S3
+- storage/          # Storage abstraction
+  - local.py         # Filesystem
+  - s3.py            # S3/MinIO
 ```
 
 ---
@@ -217,9 +217,18 @@ Deploy frequently once baseline is stable.
 | Workflows | 9 | Process flows | Weekly |
 | Request Types | 19 | Request forms | Weekly |
 | Report Types | 17 | Reports | Weekly |
-| Portlets | 509 | Dashboard widgets | Weekly |
-| Project Types | 521 | Project templates | Monthly |
+| Overview Page Sections | 61 | Overview page layouts | Weekly |
 | Dashboard Modules | 470 | Dashboard pages | Weekly |
+| Dashboard Data Sources | 505 | SQL queries behind portlets | Weekly |
+| Portlet Definitions | 509 | Dashboard widgets | Weekly |
+| Project Types | 521 | Project templates | Monthly |
+| Work Plan Templates | 522 | Standard task breakdowns | Monthly |
+| Program Types | 901 | Program-level structure | Monthly |
+| Portfolio Types | 903 | Portfolio hierarchy | Monthly |
+| OData Data Sources | 906 | OData-backed queries | Weekly |
+| Custom Menu | 907 | Custom UI menu entries | As-needed |
+| Chatbot Intent | 908 | Chatbot intents (PPM 25.2+) | Weekly |
+| PPM Integration SDK | 9900 | PPM SDK objects | As-needed |
 
 **Philosophy:** Assumes baseline exists (add_missing=false)
 

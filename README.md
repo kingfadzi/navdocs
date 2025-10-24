@@ -11,8 +11,8 @@ Git-driven deployment pipeline for OpenText PPM. Edit BOM files, commit, deploy 
 3. Pipeline validates and deploys automatically
 
 **Two deployment types:**
-- **Baseline** - ALL foundational entities (Object Types, Validations, Commands)
-- **Functional** - SPECIFIC entities (Workflows, Request Types, Reports)
+- **Baseline** - ALL foundational entities (Object Types, Request Header Types, Validations, User Data Contexts, Special Commands, Environments, Environment Groups)
+- **Functional** - SPECIFIC entities (Workflows, Request Types, Reports, Overview Pages, Dashboards, Portlets, Work Plans, Project/Program/Portfolio Types, OData Sources, Custom Menus, Chatbot Intents, PPM SDK)
 
 ---
 
@@ -60,18 +60,18 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 
 ```
 .
-├── boms/
-│   ├── baseline.yaml              # Baseline deployment BOM
-│   └── functional.yaml            # Functional deployment BOM
-├── config/
-│   ├── deployment-config.yaml     # Server/storage config
-│   └── rules.yaml                 # Governance rules
-├── profiles/
-│   ├── baseline.yaml              # Baseline flags
-│   └── functional-cd.yaml         # Functional flags
-├── tools/                         # Python deployment system
-├── templates/                     # CI/CD templates
-└── .gitlab-ci.yml                # Main pipeline
+- boms/
+  - baseline.yaml              # Baseline deployment BOM
+  - functional.yaml            # Functional deployment BOM
+- config/
+  - deployment-config.yaml     # Server/storage config
+  - rules.yaml                 # Governance rules
+- profiles/
+  - baseline.yaml              # Baseline flags
+  - functional-cd.yaml         # Functional flags
+- tools/                         # Python deployment system
+- templates/                     # CI/CD templates
+- .gitlab-ci.yml                # Main pipeline
 ```
 
 ---

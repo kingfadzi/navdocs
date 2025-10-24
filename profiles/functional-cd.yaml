@@ -94,6 +94,11 @@ entities:
     name: "Custom Menu"
     category: functional
 
+  - id: 908
+    name: "Chatbot Intent"
+    category: functional
+    note: "Available for PPM 25.2 and later"
+
   - id: 9900
     name: "PPM Integration SDK"
     category: functional

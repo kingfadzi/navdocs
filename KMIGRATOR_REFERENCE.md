@@ -141,33 +141,35 @@ The 25-character flags string controls kMigratorImport behavior. Each position c
 
 ### Flag Positions and Meanings
 
-| **Flag #** | **Description** | **Baseline** | **Functional** |
-| --- | --- | --- | --- |
-| Flag 1 | Replace existing Object Type | Y | N |
-| Flag 2 | Replace existing Request Type | N | Y |
-| Flag 3 | Replace existing Request Header Type | Y | N |
-| Flag 4 | Replace existing Special Command | Y | N |
-| Flag 5 | Replace existing Validation | Y | N |
-| Flag 6 | Replace existing Workflow | N | Y |
-| Flag 7 | Replace existing Report Type | N | Y |
-| Flag 8 | Replace existing Workplan Template | N | Y |
-| Flag 9 | Replace existing Workflow Step Sources | N | Y |
-| Flag 10 | Add missing Environment | Y (bootstrap) / N (aligned) | N |
-| Flag 11 | Add missing Security Group | Y (bootstrap) / N (aligned) | N |
-| Flag 12 | Add missing Request Status | Y (bootstrap) / N (aligned) | N |
-| Flag 13 | Replace existing Overview Page Section | N | Y |
-| Flag 14 | Replace existing User Data Context | Y | N |
-| Flag 15 | Replace existing Portlet Definition | N | Y |
-| Flag 16 | Replace existing Module | N | Y |
-| Flag 17 | Replace existing Data Source | N | Y |
-| Flag 18 | Replace existing Project Type | N | Y |
-| Flag 19 | Replace existing Sub workflow | N | Y |
-| Flag 20 | Replace existing Program Type | N | Y |
-| Flag 21 | Replace existing OData Data Source | N | Y |
-| Flag 22 | Replace existing Portfolio Type | N | Y |
-| Flag 23 | Replace existing PPM Integration SDK | N | Y |
-| Flag 24 | Replace existing menu | N | Y |
-| Flag 25 | Replace existing Chatbot intents (25.2+) | N | Y |
+| **Flag #** | **Description** |
+| --- | --- |
+| Flag 1 | Replace existing Object Type |
+| Flag 2 | Replace existing Request Type |
+| Flag 3 | Replace existing Request Header Type |
+| Flag 4 | Replace existing Special Command |
+| Flag 5 | Replace existing Validation |
+| Flag 6 | Replace existing Workflow |
+| Flag 7 | Replace existing Report Type |
+| Flag 8 | Replace existing Workplan Template |
+| Flag 9 | Replace existing Workflow Step Sources |
+| Flag 10 | Add missing Environment |
+| Flag 11 | Add missing Security Group |
+| Flag 12 | Add missing Request Status |
+| Flag 13 | Replace existing Overview Page Section |
+| Flag 14 | Replace existing User Data Context |
+| Flag 15 | Replace existing Portlet Definition |
+| Flag 16 | Replace existing Module |
+| Flag 17 | Replace existing Data Source |
+| Flag 18 | Replace existing Project Type |
+| Flag 19 | Replace existing Sub workflow |
+| Flag 20 | Replace existing Program Type |
+| Flag 21 | Replace existing OData Data Source |
+| Flag 22 | Replace existing Portfolio Type |
+| Flag 23 | Replace existing PPM Integration SDK |
+| Flag 24 | Replace existing menu |
+| Flag 25 | Replace existing Chatbot intents (25.2+) |
+
+See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for actual flag values used by this system.
 
 ### Flag Usage Notes
 
@@ -186,21 +188,23 @@ Our deployment system uses two standard flag profiles:
 
 **Baseline Profile** (`baseline`):
 ```
-YNYYYNNNNYYYNYYYYNNNNNNN
+YYYYYNNNNYYYYYNNNNNNNNN
 ```
-- Replaces: Object Types, Request Header Types, Special Commands, Validations, User Data Contexts
-- Adds (bootstrap only): Environments, Security Groups, Request Statuses
-- Does NOT replace: Workflows, Request Types, Reports, Dashboards
+- Deploys: Object Types, Request Header Types, Validations, User Data Contexts, Special Commands, Environments, Environment Groups
+- Adds missing: Environments, Security Groups, Request Statuses
+- Does NOT deploy: Workflows, Report Types, Portlets, Dashboard Modules, Dashboard Data Sources, Work Plan Templates, Project Types, Program Types, Portfolio Types, OData Data Sources, Custom Menus, Chatbot Intents, PPM Integration SDK
 
 **Functional-CD Profile** (`functional-cd`):
 ```
-NYNNNYYYYNNNYNYYYYYYYYYYN
+NYNNNYYYYNNNYNYYYYYYYYYN
 ```
-- Replaces: Request Types, Workflows, Reports, Workplan Templates, Overview Pages, Portlets, Modules, Data Sources, Project Types, Sub-workflows, Programs, OData Sources, Portfolios, SDK, Menus, Chatbot Intents
-- Does NOT add missing: Environments, Security Groups, Statuses (should exist from baseline)
-- Does NOT replace: Object Types, Header Types, Commands, Validations (baseline entities)
+- Deploys: Workflows, Request Types, Report Types, Portlet Definitions, Dashboard Modules, Dashboard Data Sources, Overview Page Sections, Work Plan Templates, Project Types, Program Types, Portfolio Types, OData Data Sources, Custom Menu, Chatbot Intent, PPM Integration SDK
+- Does NOT add missing: Environments, Security Groups, Request Statuses (baseline must already exist)
+- Does NOT deploy: Object Types, Request Header Types, Special Commands, Validations, User Data Contexts, Environment Groups
 
-See `config/profiles/*.yaml` for complete flag configuration.
+**Note:** Chatbot Intent (entity 908) is in the deployment list but `replace_chatbot_intents` flag is set to `false`. Verify entity list vs flags in `profiles/functional-cd.yaml`.
+
+See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for complete flag configuration.
 
 ---
 
