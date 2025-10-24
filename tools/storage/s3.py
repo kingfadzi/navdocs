@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-S3/MinIO storage backend for production mode.
-"""
+"""S3 storage backend for production mode."""
 
 import os
 import sys
@@ -11,22 +9,28 @@ from .base import StorageBackend
 
 
 class S3Storage(StorageBackend):
-    """S3/MinIO storage backend for production mode."""
+    """S3 storage backend for production mode."""
 
     def __init__(self, config):
         self.bucket = config.get('bucket_name')
         self.region = config.get('region', 'us-east-1')
-        self.endpoint_url = config.get('endpoint_url')  # None = AWS S3, URL = MinIO
+        self.endpoint_url = config.get('endpoint_url')
         self.prefix = config.get('prefix', 'bundles/')
 
-        if 'AWS_ACCESS_KEY_ID' not in os.environ:
-            print("ERROR: AWS_ACCESS_KEY_ID environment variable not set")
-            sys.exit(1)
-        if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
-            print("ERROR: AWS_SECRET_ACCESS_KEY environment variable not set")
-            sys.exit(1)
-
+        self._validate_credentials()
         self._client = None
+
+    def _validate_credentials(self):
+        """Validate required AWS credentials are set."""
+        missing = []
+        if 'AWS_ACCESS_KEY_ID' not in os.environ:
+            missing.append('AWS_ACCESS_KEY_ID')
+        if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
+            missing.append('AWS_SECRET_ACCESS_KEY')
+
+        if missing:
+            print(f"ERROR: Missing environment variables: {', '.join(missing)}")
+            sys.exit(1)
 
     def _get_client(self):
         """Lazy initialization of boto3 client."""
@@ -48,41 +52,45 @@ class S3Storage(StorageBackend):
         return self._client
 
     def _get_s3_url(self, storage_key, bucket=None):
-        """Format S3 URL."""
         return f"s3://{bucket or self.bucket}/{storage_key}"
 
     def _setup_temp_dir(self):
-        """Create and return temp directory."""
         temp_dir = Path('./temp_bundles')
         temp_dir.mkdir(exist_ok=True)
         return temp_dir
 
+    def _cleanup_temp_file(self, local_path):
+        """Remove temporary file if it exists."""
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+    def _handle_error(self, operation, error):
+        """Unified error handling."""
+        print(f"ERROR: {operation} failed: {error}")
+        sys.exit(1)
+
     def _s3_upload(self, local_path, storage_key):
-        """Upload file to S3 with error handling."""
         s3_client = self._get_client()
         s3_url = self._get_s3_url(storage_key)
         print(f"Uploading to S3: {s3_url}")
         try:
             s3_client.upload_file(str(local_path), self.bucket, storage_key)
-            print(f"[OK] Uploaded")
+            print("[OK] Uploaded")
             return s3_url
         except Exception as e:
-            print(f"ERROR: S3 upload failed: {e}")
-            sys.exit(1)
+            self._handle_error("S3 upload", e)
 
     def _s3_download(self, storage_key, local_path, bucket=None):
-        """Download file from S3 with error handling."""
         s3_client = self._get_client()
         s3_url = self._get_s3_url(storage_key, bucket)
         Path(local_path).parent.mkdir(parents=True, exist_ok=True)
         print(f"Downloading from S3: {s3_url}")
         try:
             s3_client.download_file(bucket or self.bucket, storage_key, str(local_path))
-            print(f"[OK] Downloaded")
+            print("[OK] Downloaded")
             return str(local_path)
         except Exception as e:
-            print(f"ERROR: S3 download failed: {e}")
-            sys.exit(1)
+            self._handle_error("S3 download", e)
 
     def upload_from_server(self, ssh_executor, ssh_config, remote_path, storage_key):
         """Upload bundle from remote server to S3 via local runner."""
@@ -92,15 +100,12 @@ class S3Storage(StorageBackend):
         print(f"Downloading {remote_path} from remote...")
         try:
             ssh_executor.scp_download(ssh_config, remote_path, str(local_path))
-            print(f"[OK] Downloaded")
+            print("[OK] Downloaded")
         except Exception as e:
-            print(f"ERROR: Failed to download from remote: {e}")
-            sys.exit(1)
+            self._handle_error("Remote download", e)
 
         s3_url = self._s3_upload(local_path, storage_key)
-
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        self._cleanup_temp_file(local_path)
 
         return {
             'storage_mode': 's3',
@@ -127,21 +132,18 @@ class S3Storage(StorageBackend):
 
         self._s3_download(s3_key, local_path, s3_bucket)
 
-        print(f"Uploading to remote server...")
+        print("Uploading to remote server...")
         try:
             ssh_executor.scp_upload(ssh_config, str(local_path), remote_path)
-            print(f"[OK] Uploaded to remote")
+            print("[OK] Uploaded to remote")
         except Exception as e:
-            print(f"ERROR: Failed to upload to remote: {e}")
-            sys.exit(1)
+            self._handle_error("Remote upload", e)
         finally:
-            if os.path.exists(local_path):
-                os.remove(local_path)
+            self._cleanup_temp_file(local_path)
 
         return True
 
     def get_metadata(self, storage_key):
-        """Get S3 object metadata."""
         s3_client = self._get_client()
 
         try:
@@ -160,9 +162,7 @@ class S3Storage(StorageBackend):
             raise
 
     def upload_file(self, local_path, storage_key):
-        """Upload local file directly to S3."""
         return self._s3_upload(local_path, storage_key)
 
     def download_file(self, storage_key, local_path):
-        """Download file from S3 to local path."""
         return self._s3_download(storage_key, local_path)
