@@ -11,40 +11,20 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Import from deployment package modules
-try:
-    from deployment.utils import (
-        load_yaml, load_config,
-        save_deployment_metadata, load_deployment_metadata,
-        get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials,
-        get_ppm_credentials
-    )
-    from deployment.archive import (
-        archive_deployment, create_evidence_package,
-        create_complete_snapshot, create_rollback_manifest,
-        print_gitlab_artifact_info
-    )
-    from deployment import rollback
-except ImportError:
-    from tools.deployment.utils import (
-        load_yaml, load_config,
-        save_deployment_metadata, load_deployment_metadata,
-        get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials,
-        get_ppm_credentials
-    )
-    from tools.deployment.archive import (
-        archive_deployment, create_evidence_package,
-        create_complete_snapshot, create_rollback_manifest,
-        print_gitlab_artifact_info
-    )
-    from tools.deployment import rollback
-
-try:
-    from executors import get_executor
-except ImportError:
-    from tools.executors import get_executor
+from .utils import (
+    load_yaml, load_config,
+    save_deployment_metadata, load_deployment_metadata,
+    get_flag_string, validate_bom_before_action,
+    get_vault_config_command, apply_default_credentials,
+    get_ppm_credentials
+)
+from .archive import (
+    archive_deployment, create_evidence_package,
+    create_complete_snapshot, create_rollback_manifest,
+    print_gitlab_artifact_info
+)
+from . import rollback
+from ..executors import get_executor
 
 
 def _print_phase(phase_num, phase_name, deployment_type=None):

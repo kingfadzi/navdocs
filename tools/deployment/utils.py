@@ -9,11 +9,7 @@ import sys
 import os
 from pathlib import Path
 
-# Import validate_bom - handle both direct execution and package import
-try:
-    from config.validation import validate_bom
-except ImportError:
-    from tools.config.validation import validate_bom
+from ..config.validation import validate_bom
 
 
 def load_yaml(file_path):

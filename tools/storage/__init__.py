@@ -7,12 +7,8 @@ This package provides abstraction for different storage backends
 
 import sys
 
-try:
-    from .local import LocalStorage
-    from .s3 import S3Storage
-except ImportError:
-    from tools.storage.local import LocalStorage
-    from tools.storage.s3 import S3Storage
+from .local import LocalStorage
+from .s3 import S3Storage
 
 
 def get_storage_backend(config):

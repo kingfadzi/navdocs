@@ -7,16 +7,8 @@ import subprocess
 import glob
 import os
 
-# Import utilities - handle both direct execution and package import
-try:
-    from executors.base import BaseExecutor
-except ImportError:
-    from tools.executors.base import BaseExecutor
-
-try:
-    from deployment.utils import get_ppm_credentials
-except ImportError:
-    from tools.deployment.utils import get_ppm_credentials
+from .base import BaseExecutor
+from ..deployment.utils import get_ppm_credentials
 
 
 class LocalExecutor(BaseExecutor):

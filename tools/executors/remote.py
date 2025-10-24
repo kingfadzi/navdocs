@@ -6,18 +6,9 @@ Remote executor for kMigrator operations with S3 storage.
 import os
 from datetime import datetime
 
-# Import utilities - handle both direct execution and package import
-try:
-    from executors.base import BaseExecutor
-    from executors.ssh import RemoteExecutor
-except ImportError:
-    from tools.executors.base import BaseExecutor
-    from tools.executors.ssh import RemoteExecutor
-
-try:
-    from deployment.utils import get_ppm_credentials
-except ImportError:
-    from tools.deployment.utils import get_ppm_credentials
+from .base import BaseExecutor
+from .ssh import RemoteExecutor
+from ..deployment.utils import get_ppm_credentials
 
 
 class RemoteKMigratorExecutor(BaseExecutor):

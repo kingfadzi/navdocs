@@ -13,14 +13,9 @@ import zipfile
 import shutil
 import json
 
-try:
-    from deployment.utils import load_yaml, load_config, apply_default_credentials
-    from config.validation import validate_bom
-    from executors import get_executor
-except ImportError:
-    from tools.deployment.utils import load_yaml, load_config, apply_default_credentials
-    from tools.config.validation import validate_bom
-    from tools.executors import get_executor
+from .utils import load_yaml, load_config, apply_default_credentials
+from ..config.validation import validate_bom
+from ..executors import get_executor
 
 def get_bom_section(bom_file, deployment_type):
     """Load the full BOM and return it as the section (BOMs are flat, not nested)."""

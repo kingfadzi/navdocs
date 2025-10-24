@@ -11,16 +11,8 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# Import utilities - handle both direct execution and package import
-try:
-    from deployment.utils import load_yaml
-except ImportError:
-    from tools.deployment.utils import load_yaml
-
-try:
-    from storage import get_storage_backend
-except ImportError:
-    from tools.storage import get_storage_backend
+from .utils import load_yaml
+from ..storage import get_storage_backend
 
 
 def create_evidence_package(bom_file, archive_path, config):
@@ -175,10 +167,10 @@ def _create_snapshot_manifest(snapshot_dir, pipeline_id, deployment_type, metada
         'pipeline_id': pipeline_id,
         'deployment_type': deployment_type,
         'snapshot_contents': {
-            'bundles': [f.name for f in bundles_dir.glob('*.xml')],
-            'metadata': [f.name for f in bundles_dir.glob('*.yaml')],
-            'archives': [f.name for f in archives_dir.glob('*')],
-            'evidence': [f.name for f in evidence_dir.glob('*.zip')],
+            'bundles': [bundle_file.name for bundle_file in bundles_dir.glob('*.xml')],
+            'metadata': [metadata_file.name for metadata_file in bundles_dir.glob('*.yaml')],
+            'archives': [archive_file.name for archive_file in archives_dir.glob('*')],
+            'evidence': [evidence_file.name for evidence_file in evidence_dir.glob('*.zip')],
             'bom': 'bom.yaml'
         },
         'note': 'Job logs available in GitLab pipeline history',

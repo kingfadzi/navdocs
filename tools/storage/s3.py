@@ -7,10 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    from .base import StorageBackend
-except ImportError:
-    from tools.storage.base import StorageBackend
+from .base import StorageBackend
 
 
 class S3Storage(StorageBackend):

@@ -3,21 +3,10 @@
 Executor factory and package exports.
 """
 
-# Import executors - handle both direct execution and package import
-try:
-    from executors.local import LocalExecutor
-    from executors.remote import RemoteKMigratorExecutor
-    from executors.ssh import RemoteExecutor
-except ImportError:
-    from tools.executors.local import LocalExecutor
-    from tools.executors.remote import RemoteKMigratorExecutor
-    from tools.executors.ssh import RemoteExecutor
-
-# Import storage backend factory
-try:
-    from storage import get_storage_backend
-except ImportError:
-    from tools.storage import get_storage_backend
+from .local import LocalExecutor
+from .remote import RemoteKMigratorExecutor
+from .ssh import RemoteExecutor
+from ..storage import get_storage_backend
 
 
 def is_remote_mode(server_config, config):
