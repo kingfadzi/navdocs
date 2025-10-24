@@ -1,12 +1,12 @@
 # Functional BOM
 # Deploy SPECIFIC business logic entities (Workflows, Request Types, Reports, Dashboards)
-version: "2.0.51"
+version: "2.0.52"
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
 created_by: "your-name"
-description: "Deploy new incident management workflow"
+description: "Test refactored Python code in pipeline"
 
 # Rollback configuration (optional)
 rollback_pipeline_id: 12344
