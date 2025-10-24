@@ -12,27 +12,9 @@ from ..deployment.utils import get_ppm_credentials
 
 
 class LocalExecutor(BaseExecutor):
-    """
-    Local kMigrator executor (mock mode).
-
-    Executes kMigrator scripts locally using subprocess.
-    Used for testing and development with mock scripts.
-    """
+    """Local kMigrator executor for testing (uses subprocess)."""
 
     def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
-        """
-        Extract entity locally (mock mode).
-
-        Args:
-            script_path: Path to kMigrator extract script
-            url: PPM server URL
-            entity_id: Entity ID to extract
-            reference_code: Optional reference code for specific entity
-            server_config: Optional server configuration dict (for credential resolution)
-
-        Returns:
-            Local file path to extracted bundle
-        """
         username, password = get_ppm_credentials(server_config)
 
         cmd = [
@@ -59,21 +41,6 @@ class LocalExecutor(BaseExecutor):
         return files[0] if files else None
 
     def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config=None):
-        """
-        Import bundle locally (mock mode).
-
-        Args:
-            script_path: Path to kMigrator import script
-            url: PPM server URL
-            bundle_file: Local file path to bundle
-            flags: 25-character kMigrator flag string
-            i18n: i18n mode (e.g., 'charset', 'none')
-            refdata: Reference data mode (e.g., 'nochange')
-            server_config: Optional server configuration dict (for credential resolution)
-
-        Returns:
-            None (prints output)
-        """
         username, password = get_ppm_credentials(server_config)
 
         cmd = [

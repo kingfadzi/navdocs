@@ -12,15 +12,7 @@ class RemoteExecutor:
     """SSH remote executor using sshpass."""
 
     def _get_credentials(self, ssh_config):
-        """
-        Get SSH credentials from environment variables.
-
-        Args:
-            ssh_config: Server configuration dict with ssh_env_vars section
-
-        Returns:
-            Tuple of (username, password, username_env_name, password_env_name)
-        """
+        """Returns (username, password, username_env_name, password_env_name)."""
         ssh_vars = ssh_config.get('ssh_env_vars', {})
         username_env = ssh_vars.get('username')
         password_env = ssh_vars.get('password')

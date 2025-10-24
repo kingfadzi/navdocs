@@ -6,22 +6,11 @@ import argparse
 # This script generates a dynamic GitLab CI child pipeline by populating a template.
 
 def load_yaml(file_path):
-    """Loads a YAML file."""
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
 
 def get_vault_provider(server_or_s3_config, deployment_config):
-    """
-    Get the vault component provider for a server or S3 configuration.
-
-    Args:
-        server_or_s3_config: Server config dict or S3 config dict
-        deployment_config: Full deployment configuration
-
-    Returns:
-        Provider configuration dict with component_url, component_version, parameter_mappings
-    """
     # Check for provider override in server/s3 config
     provider_name = server_or_s3_config.get('vault_component_provider')
 
@@ -111,7 +100,6 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
 
     # --- Step 3: Generate Vault References for Each Job ---
     def build_vault_configs(vault_role_list):
-        """Build vault config tuples (role_name, secret_path, anchor_name) from role configs."""
         vault_configs = []
         for role_config in vault_role_list:
             role_name = role_config['name']

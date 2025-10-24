@@ -12,22 +12,9 @@ from ..deployment.utils import get_ppm_credentials
 
 
 class RemoteKMigratorExecutor(BaseExecutor):
-    """
-    Remote kMigrator executor with S3 storage.
-
-    Executes kMigrator on remote PPM servers via SSH.
-    Bundles are uploaded to S3 for storage.
-    Used in production environments.
-    """
+    """Remote kMigrator executor for production (uses SSH and S3)."""
 
     def __init__(self, storage, ssh_executor=None):
-        """
-        Initialize remote executor.
-
-        Args:
-            storage: Storage backend instance (S3Storage)
-            ssh_executor: RemoteExecutor instance (optional, creates new if None)
-        """
         self.storage = storage
         self.ssh = ssh_executor if ssh_executor else RemoteExecutor()
 
