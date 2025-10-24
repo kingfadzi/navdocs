@@ -48,6 +48,19 @@ def load_rules():
     return rules
 
 
+def _get_branch_type(branch_name):
+    """Determine branch type from branch name."""
+    if not branch_name:
+        return None
+    if branch_name.startswith('feature/'):
+        return 'feature'
+    if branch_name == 'develop':
+        return 'develop'
+    if branch_name == 'main':
+        return 'main'
+    return None
+
+
 def check_rules(bom, config, rules, branch_name=None):
     """Apply governance rules. Returns list of errors."""
     errors = []
@@ -55,7 +68,6 @@ def check_rules(bom, config, rules, branch_name=None):
     source = bom.get('source_server', '')
     target = bom.get('target_server', '')
 
-    # Get env types from servers
     servers = config.get('servers', {})
     source_env = servers.get(source, {}).get('env_type', '')
     target_env = servers.get(target, {}).get('env_type', '')
@@ -97,14 +109,9 @@ def check_rules(bom, config, rules, branch_name=None):
     # RULE 5: Branch-environment alignment
     rule = rules.get('require_branch_environment_match', {})
     if rule.get('enabled') and branch_name:
+        branch_type = _get_branch_type(branch_name)
         mappings = rule.get('mappings', {})
-        branch_type = None
-        if branch_name.startswith('feature/'):
-            branch_type = 'feature'
-        elif branch_name == 'develop':
-            branch_type = 'develop'
-        elif branch_name == 'main':
-            branch_type = 'main'
+
         if branch_type and branch_type in mappings:
             allowed_envs = mappings[branch_type].get('allowed_env_types', [])
             if target_env not in allowed_envs:
@@ -189,9 +196,7 @@ def main():
     bom_file = Path(args.file)
     branch_name = args.branch or os.environ.get('CI_COMMIT_BRANCH')
 
-    print("=" * 60)
-    print("BOM VALIDATION")
-    print("=" * 60)
+    print(f"\n=== BOM VALIDATION ===")
     print(f"File: {bom_file}")
     if branch_name:
         print(f"Branch: {branch_name}")
@@ -200,24 +205,14 @@ def main():
     is_valid, errors = validate_bom(bom_file, branch_name)
 
     if is_valid:
-        print("  ✓ Valid")
+        print("✓ Valid")
     else:
-        print("  ✗ Invalid")
+        print("✗ Invalid")
         for error in errors:
-            print(f"    - {error}")
-    print()
+            print(f"  - {error}")
 
-    # Summary
-    print("=" * 60)
-    print("VALIDATION SUMMARY")
-    print("=" * 60)
-
-    if not is_valid:
-        print(f"Result: FAILED ({len(errors)} errors)")
-        sys.exit(1)
-    else:
-        print("Result: PASSED")
-        sys.exit(0)
+    print(f"\n=== RESULT: {'PASSED' if is_valid else f'FAILED ({len(errors)} errors)'} ===\n")
+    sys.exit(0 if is_valid else 1)
 
 
 if __name__ == '__main__':
