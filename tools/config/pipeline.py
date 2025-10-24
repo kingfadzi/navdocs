@@ -40,7 +40,6 @@ def get_vault_provider(server_or_s3_config, deployment_config):
 
 
 def generate_component_include(provider_config, anchor_name, vault_role_name, vault_secret_path):
-    """Generate vault component include YAML."""
     component_url = provider_config['component_url']
     component_version = provider_config['component_version']
     param_mappings = provider_config['parameter_mappings']

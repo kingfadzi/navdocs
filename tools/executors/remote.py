@@ -93,7 +93,7 @@ class RemoteKMigratorExecutor(BaseExecutor):
             # Download bundle
             print(f"Downloading to local: {local_bundle_file}")
             self.ssh.scp_download(server_config, remote_bundle_file, str(local_bundle_file))
-            print(f"✓ Downloaded: {local_bundle_file}")
+            print(f"[OK] Downloaded: {local_bundle_file}")
 
             self._cleanup_remote_workspace(server_config)
             return str(local_bundle_file)

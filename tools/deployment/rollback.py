@@ -91,7 +91,7 @@ def validate_rollback_manifest(manifest, bom_target_server):
         print("\nERROR: Target server mismatch!")
         print(f"The rollback archive was for '{manifest_target}', but the BOM targets '{bom_target_server}'.")
         sys.exit(1)
-    print("  ✓ Target server matches.")
+    print("  [OK] Target server matches.")
 
 
 def execute_rollback_from_archive(archive_path, target_url, import_script, target_server_config, config):
@@ -136,7 +136,7 @@ def _validate_bom_for_rollback(bom_file):
         for error in errors:
             print(f"  - {error}")
         sys.exit(1)
-    print("✓ BOM validation successful\n")
+    print("[OK] BOM validation successful\n")
 
 
 def _load_rollback_config(bom_file, deployment_type):
@@ -182,7 +182,7 @@ def _try_gitlab_rollback(root, rollback_pipeline_id):
     if not manifest_path.exists():
         raise FileNotFoundError("ROLLBACK_MANIFEST not in GitLab artifacts")
 
-    print("✓ Found manifest in GitLab artifacts")
+    print("[OK] Found manifest in GitLab artifacts")
     return load_yaml(manifest_path), 'gitlab', rollback_dir
 
 
@@ -201,7 +201,7 @@ def _try_s3_rollback(root, rollback_pipeline_id, config, target_server):
     try:
         storage.download_file(s3_manifest_key, local_manifest_path)
         manifest = load_yaml(local_manifest_path)
-        print("✓ Found manifest in S3")
+        print("[OK] Found manifest in S3")
 
         validate_rollback_manifest(manifest, target_server)
 
@@ -242,7 +242,7 @@ def _get_local_archive(root, manifest):
 
 
 def rollback(bom_file, deployment_type):
-    """Main rollback function with GitLab → S3 → Local fallback."""
+    """Main rollback function with GitLab to S3 to Local fallback."""
     _validate_bom_for_rollback(bom_file)
 
     root, target_server, rollback_pipeline_id, config, target_url, target_server_config, import_script = \
@@ -251,7 +251,7 @@ def rollback(bom_file, deployment_type):
     print(f"\n=== ROLLBACK DEPLOYMENT ({deployment_type.upper()}) ===")
     print(f"Target: {target_server}, Pipeline ID: {rollback_pipeline_id}\n")
 
-    # Try rollback sources in order: Local → GitLab → S3
+    # Try rollback sources in order: Local to GitLab to S3
     manifest = None
     manifest_source = None
     local_archive = None
@@ -269,7 +269,7 @@ def rollback(bom_file, deployment_type):
             # Get archive from GitLab
             archive_path = rollback_dir / manifest.get('rollback_bundle_path')
             if archive_path.exists():
-                print(f"✓ Using archive from GitLab: {archive_path.name}")
+                print(f"[OK] Using archive from GitLab: {archive_path.name}")
                 local_archive = archive_path
             else:
                 raise FileNotFoundError("Archive not in GitLab artifacts")

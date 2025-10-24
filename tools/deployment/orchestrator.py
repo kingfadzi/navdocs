@@ -99,7 +99,7 @@ def extract_command(bom_file, deployment_type):
         'refdata_mode': 'nochange'
     }
     save_deployment_metadata(metadata, f"bundles/{deployment_type}-metadata.yaml")
-    print(f"\n✓ Extracted {len(bundles)} bundles for {deployment_type}")
+    print(f"\n[OK] Extracted {len(bundles)} bundles for {deployment_type}")
     print("=" * 60)
 
 
@@ -132,7 +132,7 @@ def import_command(bom_file, deployment_type):
         # Pass server_config for credential resolution
         executor.import_bundle(import_script, target_url, bundle, flags, i18n_mode, refdata_mode, target_server_config)
 
-    print(f"\n✓ Imported {len(bundles)} bundles for {deployment_type}")
+    print(f"\n[OK] Imported {len(bundles)} bundles for {deployment_type}")
     print("=" * 60)
 
 
@@ -200,12 +200,12 @@ def validate_command(bom_file):
     if source not in config['servers']:
         print(f"✗ ERROR: Source server '{source}' not found in configuration")
         sys.exit(1)
-    print(f"  ✓ Source server '{source}' found")
+    print(f"  [OK] Source server '{source}' found")
 
     if target not in config['servers']:
         print(f"✗ ERROR: Target server '{target}' not found in configuration")
         sys.exit(1)
-    print(f"  ✓ Target server '{target}' found")
+    print(f"  [OK] Target server '{target}' found")
     print()
 
     # 3. Check required credentials are set
@@ -233,7 +233,7 @@ def validate_command(bom_file):
 
     print()
     print("=" * 60)
-    print("✓ ALL VALIDATION CHECKS PASSED")
+    print("[OK] ALL VALIDATION CHECKS PASSED")
     print("=" * 60)
     print()
     print(f"Ready to deploy from {source} to {target}")

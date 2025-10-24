@@ -218,7 +218,7 @@ def _upload_snapshot_to_s3(snapshot_dir, pipeline_id, config):
             uploaded_count += 1
 
     s3_snapshot_url = f"s3://{bucket}/{s3_prefix}/"
-    print(f"✓ Uploaded {uploaded_count} files to {s3_snapshot_url}")
+    print(f"[OK] Uploaded {uploaded_count} files to {s3_snapshot_url}")
 
     shutil.rmtree(snapshot_dir)
     print("Cleaned up temporary directory")

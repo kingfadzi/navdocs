@@ -13,13 +13,11 @@ from ..config.validation import validate_bom
 
 
 def load_yaml(file_path):
-    """Load YAML file and return contents."""
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
 
 def deep_merge(base, override):
-    """Deep merge override dict into base dict."""
     result = base.copy()
 
     for key, value in override.items():
@@ -52,7 +50,6 @@ def load_config():
 
 
 def save_deployment_metadata(metadata, output_path="bundles/deployment-metadata.yaml"):
-    """Save deployment state for passing between pipeline stages."""
     Path(output_path).parent.mkdir(exist_ok=True, parents=True)
     with open(output_path, 'w') as f:
         yaml.dump(metadata, f, default_flow_style=False)
@@ -60,7 +57,6 @@ def save_deployment_metadata(metadata, output_path="bundles/deployment-metadata.
 
 
 def load_deployment_metadata(metadata_path="bundles/deployment-metadata.yaml"):
-    """Load deployment state from previous pipeline stage."""
     if not Path(metadata_path).exists():
         print(f"Error: Metadata file not found: {metadata_path}")
         sys.exit(1)
@@ -80,16 +76,6 @@ def get_flag_string(profile_name):
 
 
 def apply_default_credentials(server_config, config):
-    """
-    Apply default credentials to server config if not already present.
-
-    Args:
-        server_config: Server configuration dict
-        config: Full deployment configuration dict
-
-    Returns:
-        Server config with credential env vars populated (in-place modification)
-    """
     default_creds = config.get('default_credentials', {})
 
     # Ensure ssh_env_vars section exists
@@ -121,17 +107,7 @@ def apply_default_credentials(server_config, config):
 
 
 def get_ppm_credentials(server_config=None):
-    """
-    Get PPM/kMigrator service account credentials from environment.
-    These credentials are used for PPM API authentication (not SSH).
-
-    Args:
-        server_config: Server configuration dict with ppm_api_env_vars section.
-                      NO DEFAULTS - configuration must be explicit.
-
-    Returns:
-        Tuple of (username, password) or exits if not found.
-    """
+    """Get PPM API credentials from environment (not SSH credentials)."""
     if not server_config:
         print("ERROR: server_config required for get_ppm_credentials()")
         sys.exit(1)
@@ -153,7 +129,7 @@ def get_ppm_credentials(server_config=None):
         print(f"Set with: export {username_env}='user' {password_env}='pass'")
         sys.exit(1)
 
-    print(f"✓ PPM credentials loaded (user={username[:3]}...{username[-2:]})")
+    print(f"[OK] PPM credentials loaded (user={username[:3]}...{username[-2:]})")
     return username, password
 
 
@@ -174,7 +150,7 @@ def validate_bom_before_action(bom_file):
         for error in errors:
             print(f"  - {error}")
         sys.exit(1)
-    print("✓ BOM validation successful\n")
+    print("[OK] BOM validation successful\n")
 
 
 def get_vault_config_command(server_name):

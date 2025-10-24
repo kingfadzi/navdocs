@@ -81,10 +81,10 @@ def check_rules(bom, config, rules, branch_name=None):
             target_idx = sequence.index(target_env)
             if target_idx != source_idx + 1:
                 if target_idx <= source_idx:
-                    errors.append(f"{rule.get('message', 'Invalid deployment order')} ({source_env} → {target_env})")
+                    errors.append(f"{rule.get('message', 'Invalid deployment order')} ({source_env} to {target_env})")
                 else:
                     expected_next = sequence[source_idx + 1]
-                    errors.append(f"{rule.get('message', 'Invalid deployment order')} - Must deploy to {expected_next} next ({source_env} → {target_env})")
+                    errors.append(f"{rule.get('message', 'Invalid deployment order')} - Must deploy to {expected_next} next ({source_env} to {target_env})")
 
     # RULE 2: Prod needs rollback
     rule = rules.get('require_prod_rollback', {})
@@ -205,7 +205,7 @@ def main():
     is_valid, errors = validate_bom(bom_file, branch_name)
 
     if is_valid:
-        print("✓ Valid")
+        print("[OK] Valid")
     else:
         print("✗ Invalid")
         for error in errors:

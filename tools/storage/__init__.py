@@ -12,7 +12,6 @@ from .s3 import S3Storage
 
 
 def get_storage_backend(config):
-    """Factory function to get appropriate storage backend."""
     storage_mode = config['deployment'].get('storage_backend', 'local')
 
     if storage_mode == 'local':

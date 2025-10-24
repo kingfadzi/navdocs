@@ -64,7 +64,7 @@ class S3Storage(StorageBackend):
         print(f"Uploading to S3: {s3_url}")
         try:
             s3_client.upload_file(str(local_path), self.bucket, storage_key)
-            print(f"✓ Uploaded")
+            print(f"[OK] Uploaded")
             return s3_url
         except Exception as e:
             print(f"ERROR: S3 upload failed: {e}")
@@ -78,7 +78,7 @@ class S3Storage(StorageBackend):
         print(f"Downloading from S3: {s3_url}")
         try:
             s3_client.download_file(bucket or self.bucket, storage_key, str(local_path))
-            print(f"✓ Downloaded")
+            print(f"[OK] Downloaded")
             return str(local_path)
         except Exception as e:
             print(f"ERROR: S3 download failed: {e}")
@@ -92,7 +92,7 @@ class S3Storage(StorageBackend):
         print(f"Downloading {remote_path} from remote...")
         try:
             ssh_executor.scp_download(ssh_config, remote_path, str(local_path))
-            print(f"✓ Downloaded")
+            print(f"[OK] Downloaded")
         except Exception as e:
             print(f"ERROR: Failed to download from remote: {e}")
             sys.exit(1)
@@ -130,7 +130,7 @@ class S3Storage(StorageBackend):
         print(f"Uploading to remote server...")
         try:
             ssh_executor.scp_upload(ssh_config, str(local_path), remote_path)
-            print(f"✓ Uploaded to remote")
+            print(f"[OK] Uploaded to remote")
         except Exception as e:
             print(f"ERROR: Failed to upload to remote: {e}")
             sys.exit(1)

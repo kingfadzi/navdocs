@@ -18,16 +18,6 @@ def is_remote_mode(server_config, config):
 
 
 def get_executor(config, server_config):
-    """
-    Factory function to create appropriate executor.
-
-    Args:
-        config: Deployment configuration dict
-        server_config: Server configuration dict
-
-    Returns:
-        LocalExecutor or RemoteKMigratorExecutor instance
-    """
     if is_remote_mode(server_config, config):
         # Remote mode: use RemoteKMigratorExecutor with S3 storage
         storage = get_storage_backend(config)
