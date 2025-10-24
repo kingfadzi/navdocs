@@ -91,17 +91,27 @@ def generate_vault_references(vault_configs):
 
     return "\n".join(refs)
 
+def _add_vault_includes(vault_roles, provider):
+    """Helper to generate vault includes for a set of roles."""
+    includes = ""
+    for role_config in vault_roles:
+        role_name = role_config['name']
+        role_path = role_config['path']
+        path_suffix = role_path.split('/')[-1]
+        unique_anchor = f'vault-{role_name}-{path_suffix}'
+        includes += generate_component_include(provider, unique_anchor, role_name, role_path)
+    return includes
+
+
 def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     """Generates the child pipeline YAML by populating a template."""
 
     bom = load_yaml(bom_file_path)
     deployment_config = load_yaml(config_file_path)
 
-    # --- Step 1: Determine Source and Target Roles (The Logic) ---
+    # Determine source and target server names
     source_server = bom.get('source_server')
     target_server = bom.get('target_server')
-
-    # Handle both string and dict formats for server names
     source_server_name = source_server.get('name') if isinstance(source_server, dict) else source_server
     target_server_name = target_server.get('name') if isinstance(target_server, dict) else target_server
 
@@ -109,52 +119,25 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
         print("Error: BOM file must contain source_server.name and target_server.name", file=sys.stderr)
         sys.exit(1)
 
-    # Find the roles and paths from the deployment config
+    # Get server configurations
     source_server_config = deployment_config['servers'][source_server_name]
     target_server_config = deployment_config['servers'][target_server_name]
     s3_config = deployment_config['s3']
 
-    # Get ALL vault roles for source and target servers (not just the first one)
-    source_vault_roles = source_server_config['vault_roles']
-    target_vault_roles = target_server_config['vault_roles']
-    s3_vault_roles = s3_config['vault_roles']
-
-    # --- Step 2: Generate Vault Component Includes (Pluggable Providers) ---
-    # Get vault providers for each component
+    # Get vault providers and roles
     source_provider = get_vault_provider(source_server_config, deployment_config)
     target_provider = get_vault_provider(target_server_config, deployment_config)
     s3_provider = get_vault_provider(s3_config, deployment_config)
 
-    # Generate component includes using provider configurations
+    source_vault_roles = source_server_config['vault_roles']
+    target_vault_roles = target_server_config['vault_roles']
+    s3_vault_roles = s3_config['vault_roles']
+
+    # Generate vault component includes
     vault_includes = "# Vault component includes for dynamic child pipeline\ninclude:\n"
-
-    # Include ALL source server vault roles (SSH + PPM credentials)
-    for role_config in source_vault_roles:
-        role_name = role_config['name']
-        role_path = role_config['path']
-        # Extract unique identifier from path (e.g., "mars" from "secret/data/infrastructure/ssh/mars")
-        path_suffix = role_path.split('/')[-1]
-        unique_anchor = f'vault-{role_name}-{path_suffix}'
-        vault_includes += generate_component_include(source_provider, unique_anchor, role_name, role_path)
-
-    # Include ALL target server vault roles (SSH + PPM credentials)
-    for role_config in target_vault_roles:
-        role_name = role_config['name']
-        role_path = role_config['path']
-        # Extract unique identifier from path (e.g., "phobos" from "secret/data/infrastructure/ssh/phobos")
-        path_suffix = role_path.split('/')[-1]
-        unique_anchor = f'vault-{role_name}-{path_suffix}'
-        vault_includes += generate_component_include(target_provider, unique_anchor, role_name, role_path)
-
-    # Include S3 vault roles
-    for role_config in s3_vault_roles:
-        role_name = role_config['name']
-        role_path = role_config['path']
-        # Extract unique identifier from path (e.g., "s3" from "secret/data/shared/s3")
-        path_suffix = role_path.split('/')[-1]
-        unique_anchor = f'vault-{role_name}-{path_suffix}'
-        vault_includes += generate_component_include(s3_provider, unique_anchor, role_name, role_path)
-
+    vault_includes += _add_vault_includes(source_vault_roles, source_provider)
+    vault_includes += _add_vault_includes(target_vault_roles, target_provider)
+    vault_includes += _add_vault_includes(s3_vault_roles, s3_provider)
     vault_includes += "\n"
 
     # --- Step 3: Generate Vault References for Each Job ---

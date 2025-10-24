@@ -136,55 +136,28 @@ def get_ppm_credentials(server_config=None):
     Returns:
         Tuple of (username, password) or exits if not found.
     """
-    # Require explicit configuration - NO implicit defaults
     if not server_config:
-        print("ERROR: server_config must be provided to get_ppm_credentials()")
+        print("ERROR: server_config required for get_ppm_credentials()")
         sys.exit(1)
 
     ppm_vars = server_config.get('ppm_api_env_vars', {})
     username_env = ppm_vars.get('username')
     password_env = ppm_vars.get('password')
 
-    # Fail fast if credential env vars are not configured
     if not username_env or not password_env:
-        print("=" * 60)
-        print("ERROR: PPM credential environment variable names not configured")
-        print("=" * 60)
-        print("\nRequired in server config:")
-        print("  ppm_api_env_vars:")
-        print("    username: 'PPM_SERVICE_ACCOUNT_USER'")
-        print("    password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
-        print("\nAdd to config/deployment-config.yaml:")
-        print("  servers:")
-        print("    your-server:")
-        print("      ppm_api_env_vars:")
-        print("        username: 'PPM_SERVICE_ACCOUNT_USER'")
-        print("        password: 'PPM_SERVICE_ACCOUNT_PASSWORD'")
-        print("=" * 60)
+        print(f"ERROR: Missing ppm_api_env_vars in server config")
+        print(f"Add to deployment-config.yaml: ppm_api_env_vars: {{username: 'ENV_VAR', password: 'ENV_VAR'}}")
         sys.exit(1)
 
-    # Read credentials from configured env vars
     username = os.environ.get(username_env)
     password = os.environ.get(password_env)
 
     if not username or not password:
-        print("=" * 60)
-        print("ERROR: PPM credentials not set in environment")
-        print("=" * 60)
-        print(f"\nRequired environment variables:")
-        print(f"  {username_env}")
-        print(f"  {password_env}")
-        print(f"\nSet them with:")
-        print(f"  export {username_env}='your_ppm_username'")
-        print(f"  export {password_env}='your_ppm_password'")
-        print(f"\nOr add to ~/.bashrc or create a credentials file:")
-        print(f"  echo 'export {username_env}=your_username' >> ~/.ppm_credentials")
-        print(f"  echo 'export {password_env}=your_password' >> ~/.ppm_credentials")
-        print(f"  source ~/.ppm_credentials")
-        print("=" * 60)
+        print(f"ERROR: Credentials not set: {username_env}, {password_env}")
+        print(f"Set with: export {username_env}='user' {password_env}='pass'")
         sys.exit(1)
 
-    print(f"✓ PPM credentials loaded (user={username[:3]}...{username[-2:]}, password={'*' * len(password)})")
+    print(f"✓ PPM credentials loaded (user={username[:3]}...{username[-2:]})")
     return username, password
 
 
@@ -198,19 +171,14 @@ def is_remote_mode(server_config, config):
 
 def validate_bom_before_action(bom_file):
     """Helper to run validation and exit on failure."""
-    print("=" * 60)
-    print("VALIDATING BOM")
-    print("=" * 60)
+    print("\n=== VALIDATING BOM ===")
     is_valid, errors = validate_bom(bom_file)
     if not is_valid:
-        print("BOM validation failed. Errors:")
+        print("BOM validation failed:")
         for error in errors:
             print(f"  - {error}")
-        print("\nPlease fix the errors in the BOM file before proceeding.")
         sys.exit(1)
-    print("BOM validation successful.")
-    print("=" * 60)
-    print()
+    print("✓ BOM validation successful\n")
 
 
 def get_vault_config_command(server_name):

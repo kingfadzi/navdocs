@@ -50,8 +50,8 @@ class LocalExecutor(BaseExecutor):
         if reference_code:
             cmd.extend(['-referenceCode', reference_code])
 
-        print(f"Extracting entity {entity_id}" + (f" ({reference_code})" if reference_code else " (ALL)") + f" from {url} (LOCAL)")
-        print(f"Command: {' '.join(cmd)}\n")
+        ref_info = f" ({reference_code})" if reference_code else " (ALL)"
+        print(f"Extracting entity {entity_id}{ref_info} from {url} (LOCAL)")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(result.stdout)
@@ -90,7 +90,6 @@ class LocalExecutor(BaseExecutor):
             '-i18n', i18n, '-refdata', refdata, '-flags', flags
         ]
         print(f"Importing {bundle_file} to {url} (LOCAL)")
-        print(f"Command: {' '.join(cmd)}\n")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(result.stdout)
