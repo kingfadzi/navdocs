@@ -48,13 +48,15 @@ sh ./kMigratorExtract.sh \
   -entityId 9 \
   -filename /tmp/incident_workflow.xml
 
-# Extract all object types (baseline entity)
+# Extract specific object type (baseline entity)
 sh ./kMigratorExtract.sh \
   -username admin \
   -password <password> \
   -url https://ppm.example.com:8443 \
   -action Bundle \
-  -entityId 26
+  -referenceCode OBJ_CUSTOM_ASSET \
+  -entityId 26 \
+  -filename /tmp/object_type.xml
 ```
 
 ---
