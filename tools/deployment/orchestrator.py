@@ -47,11 +47,21 @@ except ImportError:
     from tools.executors import get_executor
 
 
+def _print_phase(phase_num, phase_name, deployment_type=None):
+    """Helper to print phase headers."""
+    if deployment_type:
+        print(f"\n{'='*60}")
+        print(f"PHASE {phase_num}: {phase_name} ({deployment_type.upper()})")
+        print(f"{'='*60}")
+    else:
+        print(f"\n{'='*60}")
+        print(f"{phase_name}")
+        print(f"{'='*60}")
+
+
 def extract_command(bom_file, deployment_type):
     """PHASE 1: Extract entities and save metadata."""
-    print("=" * 60)
-    print(f"PHASE 1: EXTRACT ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(1, "EXTRACT", deployment_type)
     root = Path(__file__).parent.parent.parent
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
@@ -115,9 +125,7 @@ def extract_command(bom_file, deployment_type):
 
 def import_command(bom_file, deployment_type):
     """PHASE 2: Import bundles to target server."""
-    print("=" * 60)
-    print(f"PHASE 2: IMPORT ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(2, "IMPORT", deployment_type)
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     target_server = metadata['target_server']
     flags = metadata['flags']
@@ -150,9 +158,7 @@ def import_command(bom_file, deployment_type):
 
 def archive_command(bom_file, deployment_type):
     """PHASE 3: Archive and create evidence."""
-    print("=" * 60)
-    print(f"PHASE 3: ARCHIVE ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(3, "ARCHIVE", deployment_type)
 
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     root = Path(__file__).parent.parent.parent
@@ -196,10 +202,7 @@ def archive_command(bom_file, deployment_type):
 
 def validate_command(bom_file):
     """Validate BOM and check environment is ready for deployment."""
-    print("=" * 60)
-    print("VALIDATING DEPLOYMENT PREREQUISITES")
-    print("=" * 60)
-    print()
+    _print_phase(None, "VALIDATING DEPLOYMENT PREREQUISITES")
 
     # 1. Validate BOM file
     print("[1/3] Validating BOM file...")
@@ -258,16 +261,9 @@ def validate_command(bom_file):
 
 
 def deploy_command(bom_file, deployment_type):
-    """
-    One-shot deployment that runs the full extract -> import -> archive sequence.
-    """
-    # First, validate the BOM file.
+    """One-shot deployment that runs the full extract -> import -> archive sequence."""
     validate_bom_before_action(bom_file)
-
-    print("=" * 60)
-    print(f"DEPLOYMENT ({deployment_type.upper()})")
-    print("=" * 60)
-    print()
+    _print_phase(None, f"DEPLOYMENT ({deployment_type.upper()})")
 
     # Phase 1: Extract
     extract_command(bom_file, deployment_type)
