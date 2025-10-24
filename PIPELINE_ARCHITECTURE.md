@@ -2,6 +2,8 @@
 
 How the GitLab pipeline executes deployments.
 
+![Pipeline Architecture Diagram](http://www.plantuml.com/plantuml/proxy?src=https://eros.butterflycluster.com/staging/navdocs/-/raw/main/docs/pipeline-architecture.puml)
+
 ---
 
 ## Two-Tier Design
