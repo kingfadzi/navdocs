@@ -126,9 +126,9 @@ tools/
 
 **Bundle flow in S3 mode:**
 ```
-Extract: PPM Server -> Runner -> S3 -> GitLab artifacts
+Extract: PPM Server -> Runner -> GitLab artifacts
 Import: GitLab artifacts -> Runner -> PPM Server
-Archive: Create ZIP -> S3 + GitLab artifacts
+Archive: Create ZIP -> S3 (permanent) + GitLab artifacts
 ```
 
 ---

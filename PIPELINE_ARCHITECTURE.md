@@ -56,7 +56,7 @@ Trigger (start child pipeline)
 
 ```
 Extract Stage
-  SSH to source -> kMigratorExtract.sh -> Upload S3 -> GitLab artifacts
+  SSH to source -> kMigratorExtract.sh -> Download to runner -> GitLab artifacts
     |
     v
 Import Stage (needs: extract)
@@ -64,16 +64,16 @@ Import Stage (needs: extract)
     |
     v
 Archive Stage (needs: extract, import)
-  Create ZIP -> Upload S3 -> GitLab artifacts (1 year)
+  Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 ```
 
 ### Stages
 
 | Stage | Command | Process | Artifacts | Retention |
 |-------|---------|---------|-----------|-----------|
-| extract | `orchestrator extract` | SSH -> kMigrator -> S3 -> artifacts | bundles/*.xml, metadata.yaml | 1 week |
+| extract | `orchestrator extract` | SSH -> kMigrator -> Download to runner | bundles/*.xml, metadata.yaml | 1 week |
 | import | `orchestrator import` | Artifacts -> SSH -> kMigrator | None | N/A |
-| archive | `orchestrator archive` | ZIP -> S3 -> artifacts | archive.zip, evidence.zip, manifest.yaml | 1 year |
+| archive | `orchestrator archive` | ZIP -> S3 + artifacts | archive.zip, evidence.zip, manifest.yaml | 1 year |
 
 ---
 
@@ -83,12 +83,10 @@ Credentials injected per stage via GitLab components.
 
 ### Extract Stage
 - SSH credentials (source server)
-- S3 read credentials
 - PPM credentials
 
 ### Import Stage
 - SSH credentials (target server)
-- S3 read credentials
 - PPM credentials
 
 ### Archive Stage
@@ -109,9 +107,9 @@ Credentials injected per stage via GitLab components.
 
 **Bundle flow:**
 ```
-Extract: PPM -> Runner -> S3 (permanent) + GitLab (1 week)
+Extract: PPM -> Runner -> GitLab artifacts (1 week)
 Import: GitLab artifacts -> Runner -> PPM
-Archive: Create ZIP -> S3 (permanent) + GitLab (1 year)
+Archive: Create ZIP -> S3 (permanent) + GitLab artifacts (1 year)
 ```
 
 ---
@@ -198,7 +196,7 @@ Archive: Create ZIP -> S3 (permanent) + GitLab (1 year)
 - Output: Rollback package (1 year retention)
 
 **Vault:** Per-stage credential injection
-- Extract/Import: SSH + S3 read + PPM
+- Extract/Import: SSH + PPM
 - Archive: S3 write
 
 **Artifacts:** Two-tier storage
