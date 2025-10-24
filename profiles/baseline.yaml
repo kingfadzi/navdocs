@@ -39,6 +39,8 @@ flags:
   add_missing_request_status: true
 
 # Entities to extract and migrate
+# Entity IDs defined in OpenText PPM documentation:
+# https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm
 entities:
   - id: 26
     name: "Object Types"

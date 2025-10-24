@@ -10,6 +10,8 @@ This document provides technical reference for OpenText PPM kMigrator scripts us
 
 The kMigratorExtract script extracts PPM entities from a source environment and creates XML bundle files.
 
+**Official Documentation:** [kMigratorExtract.sh - OpenText PPM 25.1-25.3](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm)
+
 ### Required Parameters
 
 | **Parameter** | **Description** |
@@ -212,30 +214,15 @@ See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for complete flag
 
 Entity IDs are used by kMigratorExtract to identify which entity type to extract.
 
-| **Entity ID** | **Entity Type** | **Category** | **Description** |
-| --- | --- | --- | --- |
-| 4 | Environment | Baseline | Logical deployment targets referenced in workflows |
-| 9 | Workflow | Functional | Process flows for requests/projects |
-| 11 | Special Command | Baseline | Reusable backend functions called in workflows |
-| 13 | Validation | Baseline | Lookup lists and rules for fields |
-| 17 | Report Type | Functional | Parameterized reports |
-| 19 | Request Type | Functional | Request forms linked to workflows |
-| 26 | Object Type | Baseline | Structure and behavior of objects (requests, projects, packages) |
-| 37 | User Data Context | Baseline | Shared user data for custom fields |
-| 39 | Request Header Type | Baseline | Fields and layout for request forms |
-| 58 | Environment Group | Baseline | Logical deployment target groups |
-| 61 | Overview Page Section | Functional | Overview page layout definitions |
-| 470 | Module | Functional | Dashboard pages and layouts |
-| 505 | Data Source | Functional | SQL queries behind portlets |
-| 509 | Portlet Definition | Functional | Dashboard widgets |
-| 521 | Project Type | Functional | Project templates, policies, lifecycle |
-| 522 | Workplan Template | Functional | Standard project task breakdowns |
-| 901 | Program Type | Functional | Program-level structure |
-| 903 | Portfolio Type | Functional | Portfolio containers and hierarchy |
-| 906 | OData Data Source | Functional | OData-backed queries (links NOT migrated) |
-| 907 | Custom Menu | Functional | Custom UI menu entries |
-| 908 | Chatbot Intent | Functional | Chatbot intents (PPM 25.2+) |
-| 9900 | PPM Integration SDK | Functional | PPM Integration SDK objects |
+**Official Documentation:** [Entity Type IDs - OpenText PPM](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm)
+
+**Complete entity list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#complete-entity-list-all-22-entities-sorted-by-id)
+
+**Quick reference:**
+- **Baseline entities (7):** IDs 4, 11, 13, 26, 37, 39, 58
+- **Functional entities (15):** IDs 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
+
+For detailed descriptions, deployment frequency, and categorization, see the [Entity Reference](docs/ENTITY_REFERENCE.md).
 
 ### Entity Categories
 

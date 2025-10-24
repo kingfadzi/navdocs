@@ -196,39 +196,19 @@ servers:
 
 Must exist before functional deployments.
 
-| Entity | ID | Purpose | Change Freq |
-|--------|----|---------| ------------|
-| Object Types | 26 | Define object structure | Quarterly |
-| Request Header Types | 39 | Define request forms | Quarterly |
-| Validations | 13 | Lookup lists and rules | Monthly |
-| User Data Contexts | 37 | Shared custom fields | Quarterly |
-| Special Commands | 11 | Backend functions | As-needed |
-| Environments | 4 | Deployment targets | Rarely |
-| Environment Groups | 58 | Target groups | Rarely |
+**Complete list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#baseline-entities-infrastructure---7-entities)
 
-**Philosophy:** Drift correction (add_missing=true)
+**Baseline entities (7):** Object Types (26), Request Header Types (39), Validations (13), User Data Contexts (37), Special Commands (11), Environments (4), Environment Groups (58)
+
+**Philosophy:** Drift correction enabled (add_missing=true)
 
 ### Functional Entities (Business Logic)
 
 Deploy frequently once baseline is stable.
 
-| Entity | ID | Purpose | Change Freq |
-|--------|----|---------| ------------|
-| Workflows | 9 | Process flows | Weekly |
-| Request Types | 19 | Request forms | Weekly |
-| Report Types | 17 | Reports | Weekly |
-| Overview Page Sections | 61 | Overview page layouts | Weekly |
-| Dashboard Modules | 470 | Dashboard pages | Weekly |
-| Dashboard Data Sources | 505 | SQL queries behind portlets | Weekly |
-| Portlet Definitions | 509 | Dashboard widgets | Weekly |
-| Project Types | 521 | Project templates | Monthly |
-| Work Plan Templates | 522 | Standard task breakdowns | Monthly |
-| Program Types | 901 | Program-level structure | Monthly |
-| Portfolio Types | 903 | Portfolio hierarchy | Monthly |
-| OData Data Sources | 906 | OData-backed queries | Weekly |
-| Custom Menu | 907 | Custom UI menu entries | As-needed |
-| Chatbot Intent | 908 | Chatbot intents (PPM 25.2+) | Weekly |
-| PPM Integration SDK | 9900 | PPM SDK objects | As-needed |
+**Complete list:** See [Entity Reference](docs/ENTITY_REFERENCE.md#functional-entities-business-logic---15-entities)
+
+**Functional entities (15):** Workflows (9), Request Types (19), Reports (17), Overview Pages (61), Dashboards (470, 505, 509), Project/Program/Portfolio Types (521, 901, 903), Work Plans (522), OData Sources (906), Custom Menu (907), Chatbot Intents (908), PPM SDK (9900)
 
 **Philosophy:** Assumes baseline exists (add_missing=false)
 
