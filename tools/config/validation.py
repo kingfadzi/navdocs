@@ -194,30 +194,13 @@ def validate_bom(bom_file, branch_name=None):
     if not bom:
         return False, ["BOM file is empty"]
 
-    # STEP 1: Validate against JSON schema (structure, types, required fields, entity IDs)
+    # STEP 1: Validate against JSON schema
+    # Schema validates: structure, types, required fields, entity IDs, profile enum, reference_code pattern
     is_valid, schema_errors = validate_against_schema(bom, bom_file)
     if not is_valid:
-        errors.extend(schema_errors)
-        # If schema validation fails, stop here (no point checking rules)
-        return False, errors
+        return False, schema_errors
 
-    # STEP 2: Check if profile file exists
-    if 'profile' in bom:
-        root = Path(__file__).parent.parent.parent
-        profile_path = root / 'profiles' / f"{bom['profile']}.yaml"
-        if not profile_path.exists():
-            errors.append(f"Profile not found: {bom['profile']} (expected: {profile_path})")
-
-    # STEP 3: Validate entities have reference_code (already checked by schema, but double-check)
-    category = bom.get('category')
-    if 'entities' in bom:
-        for i, entity in enumerate(bom['entities']):
-            if 'id' not in entity:
-                errors.append(f"Entity {i}: missing 'id' field")
-            if 'reference_code' not in entity:
-                errors.append(f"Entity {i}: missing 'reference_code' field (mandatory per OpenText spec)")
-
-    # STEP 4: Apply governance rules
+    # STEP 2: Apply governance rules
     config = load_config()
     rules = load_rules()
     if config and rules:
