@@ -6,11 +6,18 @@ Validates BOM files for schema compliance and required fields
 
 import sys
 import yaml
+import json
 import re
 import os
 from pathlib import Path
 import argparse
 import subprocess
+
+try:
+    import jsonschema
+except ImportError:
+    print("Error: jsonschema package not installed. Install with: pip install jsonschema")
+    sys.exit(1)
 
 
 def load_yaml(file_path):
@@ -46,6 +53,51 @@ def load_rules():
         print(f"Error loading rules.yaml: {err}")
         sys.exit(1)
     return rules
+
+
+def validate_against_schema(bom, bom_file):
+    """
+    Validate BOM against JSON schema based on category.
+    Returns (is_valid, errors_list)
+    """
+    errors = []
+
+    # Check for category field
+    category = bom.get('category')
+    if not category:
+        return False, ["Missing required field: category (must be 'baseline' or 'functional')"]
+
+    # Determine schema file based on category
+    root = Path(__file__).parent.parent.parent
+    if category == 'baseline':
+        schema_file = root / 'schemas' / 'bom-baseline-schema.json'
+    elif category == 'functional':
+        schema_file = root / 'schemas' / 'bom-functional-schema.json'
+    else:
+        return False, [f"Invalid category: {category} (must be 'baseline' or 'functional')"]
+
+    # Check if schema file exists
+    if not schema_file.exists():
+        return False, [f"Schema file not found: {schema_file}"]
+
+    # Load schema
+    try:
+        with open(schema_file, 'r') as f:
+            schema = json.load(f)
+    except Exception as e:
+        return False, [f"Error loading schema file: {e}"]
+
+    # Validate against schema
+    try:
+        jsonschema.validate(instance=bom, schema=schema)
+        return True, []
+    except jsonschema.ValidationError as e:
+        # Parse validation error into readable message
+        error_path = ' -> '.join(str(p) for p in e.path) if e.path else 'root'
+        error_msg = f"Schema validation failed at '{error_path}': {e.message}"
+        return False, [error_msg]
+    except jsonschema.SchemaError as e:
+        return False, [f"Schema file is invalid: {e.message}"]
 
 
 def _get_branch_type(branch_name):
@@ -127,6 +179,7 @@ def check_rules(bom, config, rules, branch_name=None):
 def validate_bom(bom_file, branch_name=None):
     """
     Validate a single BOM file (baseline.yaml or functional.yaml).
+    Uses JSON schema validation + governance rules.
     """
     errors = []
     bom_path = Path(bom_file)
@@ -141,42 +194,30 @@ def validate_bom(bom_file, branch_name=None):
     if not bom:
         return False, ["BOM file is empty"]
 
-    # Required fields for all BOMs
-    required_fields = ['version', 'profile', 'source_server', 'target_server', 'created_by']
-    for field in required_fields:
-        if field not in bom:
-            errors.append(f"Missing required field: {field}")
+    # STEP 1: Validate against JSON schema (structure, types, required fields, entity IDs)
+    is_valid, schema_errors = validate_against_schema(bom, bom_file)
+    if not is_valid:
+        errors.extend(schema_errors)
+        # If schema validation fails, stop here (no point checking rules)
+        return False, errors
 
-    # Check if profile file exists
+    # STEP 2: Check if profile file exists
     if 'profile' in bom:
         root = Path(__file__).parent.parent.parent
         profile_path = root / 'profiles' / f"{bom['profile']}.yaml"
         if not profile_path.exists():
             errors.append(f"Profile not found: {bom['profile']} (expected: {profile_path})")
 
-    # Determine BOM type from profile and validate accordingly
-    profile = bom.get('profile', '')
-    is_rollback = 'rollback_pipeline_id' in bom
+    # STEP 3: Validate entities have reference_code (already checked by schema, but double-check)
+    category = bom.get('category')
+    if 'entities' in bom:
+        for i, entity in enumerate(bom['entities']):
+            if 'id' not in entity:
+                errors.append(f"Entity {i}: missing 'id' field")
+            if 'reference_code' not in entity:
+                errors.append(f"Entity {i}: missing 'reference_code' field (mandatory per OpenText spec)")
 
-    if 'baseline' in profile.lower():
-        # Baseline-specific validation
-        if 'description' not in bom:
-            errors.append("Baseline BOMs require 'description' field")
-    elif 'functional' in profile.lower():
-        # Functional-specific validation
-        if not is_rollback and 'entities' not in bom:
-            errors.append("Functional BOMs require 'entities' field (unless rollback)")
-        if 'entities' in bom:
-            if not isinstance(bom['entities'], list) or len(bom['entities']) == 0:
-                errors.append("Entities must be a non-empty list")
-            else:
-                for i, entity in enumerate(bom['entities']):
-                    if 'entity_id' not in entity:
-                        errors.append(f"Entity {i}: missing entity_id")
-                    if 'reference_code' not in entity:
-                        errors.append(f"Entity {i}: missing reference_code")
-
-    # Apply governance rules
+    # STEP 4: Apply governance rules
     config = load_config()
     rules = load_rules()
     if config and rules:
@@ -187,7 +228,7 @@ def validate_bom(bom_file, branch_name=None):
 
 def main():
     """Main validation entry point."""
-    parser = argparse.ArgumentParser(description='Validate BOM files')
+    parser = argparse.ArgumentParser(description='Validate BOM files using JSON schema + governance rules')
     parser.add_argument('--file', required=True, help='Validate specific BOM file')
     parser.add_argument('--branch', help='Git branch name (for environment validation)')
 
@@ -196,7 +237,7 @@ def main():
     bom_file = Path(args.file)
     branch_name = args.branch or os.environ.get('CI_COMMIT_BRANCH')
 
-    print(f"\n=== BOM VALIDATION ===")
+    print(f"\n=== BOM VALIDATION (JSON Schema + Governance Rules) ===")
     print(f"File: {bom_file}")
     if branch_name:
         print(f"Branch: {branch_name}")
@@ -205,9 +246,11 @@ def main():
     is_valid, errors = validate_bom(bom_file, branch_name)
 
     if is_valid:
-        print("[OK] Valid")
+        print("✓ [OK] BOM is valid")
+        print("  - Schema validation: PASSED")
+        print("  - Governance rules: PASSED")
     else:
-        print("✗ Invalid")
+        print("✗ [FAILED] BOM validation failed")
         for error in errors:
             print(f"  - {error}")
 

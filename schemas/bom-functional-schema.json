@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Functional BOM Schema",
+  "description": "Schema for validating functional deployment BOMs",
+  "type": "object",
+  "required": ["version", "category", "profile", "source_server", "target_server", "entities"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version number"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["functional"],
+      "description": "BOM category - must be 'functional'"
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["functional-cd"],
+      "description": "Profile name for flag configuration"
+    },
+    "source_server": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Source PPM server name"
+    },
+    "target_server": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target PPM server name"
+    },
+    "change_request": {
+      "type": "string",
+      "description": "Change request or ticket number"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "BOM author"
+    },
+    "description": {
+      "type": "string",
+      "description": "BOM description"
+    },
+    "entities": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of entities to deploy",
+      "items": {
+        "type": "object",
+        "required": ["id", "reference_code"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "enum": [9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900],
+            "description": "PPM entity type ID (functional types only)"
+          },
+          "reference_code": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "Entity reference code (UPPERCASE with underscores)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional human-readable name for documentation"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rollback_pipeline_id": {
+      "type": "integer",
+      "description": "Pipeline ID to rollback to (optional)"
+    }
+  },
+  "additionalProperties": false
+}

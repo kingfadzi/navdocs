@@ -45,35 +45,31 @@ class RemoteKMigratorExecutor(BaseExecutor):
         print(stdout)
         return stdout
 
-    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
+    def extract(self, script_path, url, entity_id, reference_code, server_config=None):
         """Extract entity remotely and download to local bundles/ directory."""
         username, password = get_ppm_credentials(server_config)
 
-        # Generate paths
+        # Generate paths - referenceCode is now MANDATORY per OpenText spec
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        ref_suffix = f"_{reference_code}" if reference_code else ""
-        bundle_filename = f"KMIGRATOR_EXTRACT_{entity_id}{ref_suffix}_{timestamp}.xml"
+        bundle_filename = f"KMIGRATOR_EXTRACT_{entity_id}_{reference_code}_{timestamp}.xml"
 
         from pathlib import Path
         local_bundle_dir = Path("./bundles")
         local_bundle_dir.mkdir(exist_ok=True)
         local_bundle_file = local_bundle_dir / bundle_filename
 
-        ref_info = f" ({reference_code})" if reference_code else " (ALL)"
-        print(f"Extracting entity {entity_id}{ref_info} from {url} (REMOTE)")
+        print(f"Extracting entity {entity_id} ({reference_code}) from {url} (REMOTE)")
 
         try:
             remote_bundle_dir = self._setup_remote_workspace(server_config)
             remote_bundle_file = f"{remote_bundle_dir}/{bundle_filename}"
 
-            # Build and execute kMigrator command
+            # Build and execute kMigrator command - referenceCode always included
             kmigrator_cmd = (
                 f"{script_path} -username {username} -password {password} "
-                f"-url {url} -action Bundle -entityId {entity_id}"
+                f"-url {url} -action Bundle -entityId {entity_id} "
+                f"-referenceCode {reference_code} -filename {remote_bundle_file}"
             )
-            if reference_code:
-                kmigrator_cmd += f" -referenceCode {reference_code}"
-            kmigrator_cmd += f" -filename {remote_bundle_file}"
 
             self._execute_kmigrator(server_config, kmigrator_cmd, "extract")
 

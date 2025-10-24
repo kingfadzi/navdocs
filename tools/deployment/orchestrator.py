@@ -47,8 +47,8 @@ def extract_command(bom_file, deployment_type):
     profile_name = bom['profile']
     source_server = bom['source_server']
     target_server = bom['target_server']
+    category = bom.get('category', deployment_type)  # Use category from BOM
 
-    is_baseline = 'baseline' in profile_name.lower()
     config = load_config()
     source_url = config['servers'][source_server]['url']
     source_server_config = config['servers'][source_server]
@@ -66,25 +66,31 @@ def extract_command(bom_file, deployment_type):
     print(f"Storage: {storage_mode.upper()}")
     print(f"Flags: {flags}\n")
 
+    # Unified BOM-centric extraction (both baseline and functional use same structure)
     bundles = []
-    if is_baseline:
-        profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
-        print(f"Extracting {len(profile['entities'])} baseline entity types...\n")
-        for entity in profile['entities']:
-            # Pass server_config for credential resolution
-            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
-            bundle = executor.extract(extract_script, source_url, entity['id'], None, source_server_config)
-            bundles.append(bundle)
-    else:
-        print(f"Extracting {len(bom['entities'])} functional entities...\n")
-        for entity in bom['entities']:
-            # Pass server_config for credential resolution
-            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
-            bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'], source_server_config)
-            bundles.append(bundle)
+    entities = bom.get('entities', [])
+
+    if not entities:
+        print("ERROR: No entities found in BOM. BOM must contain 'entities' list.")
+        sys.exit(1)
+
+    print(f"Extracting {len(entities)} entities from {source_server}...\n")
+    for entity in entities:
+        # Both baseline and functional now use same BOM structure: id + reference_code
+        entity_id = entity['id']
+        reference_code = entity['reference_code']  # Now mandatory per OpenText spec
+        entity_name = entity.get('name', reference_code)  # Optional name for logging
+
+        print(f"  [{entity_id}] {entity_name} ({reference_code})")
+
+        # Pass server_config for credential resolution
+        # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
+        bundle = executor.extract(extract_script, source_url, entity_id, reference_code, source_server_config)
+        bundles.append(bundle)
 
     metadata = {
         'deployment_type': deployment_type,
+        'category': category,  # baseline or functional
         'profile': profile_name,
         'source_server': source_server,
         'target_server': target_server,
@@ -95,7 +101,7 @@ def extract_command(bom_file, deployment_type):
         'bom_version': bom.get('version', 'unknown'),
         'change_request': bom.get('change_request', 'N/A'),
         'extracted_at': datetime.now().isoformat(),
-        'i18n_mode': 'none' if is_baseline else 'charset',
+        'i18n_mode': 'none' if category == 'baseline' else 'charset',
         'refdata_mode': 'nochange'
     }
     save_deployment_metadata(metadata, f"bundles/{deployment_type}-metadata.yaml")
@@ -237,7 +243,7 @@ def validate_command(bom_file):
     print("=" * 60)
     print()
     print(f"Ready to deploy from {source} to {target}")
-    print(f"Run: python3 -m tools.deployment.orchestrator deploy --type {bom.get('profile', 'unknown')} --bom {bom_file}")
+    print(f"Run: python3 -m tools.deployment.orchestrator deploy --type {bom.get('category', 'unknown')} --bom {bom_file}")
 
 
 def deploy_command(bom_file, deployment_type):

@@ -1,0 +1,186 @@
+# PPM Entity Type Reference
+# Source: OpenText PPM Documentation
+# https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm
+#
+# This file documents valid entity IDs for baseline and functional deployments
+# Used by JSON schemas to validate BOM entity types
+
+baseline_entities:
+  4:
+    name: "Environment"
+    description: "Logical deployment targets referenced in workflows"
+    example_reference_codes:
+      - "ENV_PRODUCTION"
+      - "ENV_STAGING"
+      - "ENV_DEV"
+      - "ENV_TEST"
+
+  11:
+    name: "Special Command"
+    description: "Reusable backend functions called in workflows"
+    example_reference_codes:
+      - "CMD_ASSIGN_OWNER"
+      - "CMD_NOTIFY_TEAM"
+      - "CMD_CREATE_TICKET"
+      - "CMD_UPDATE_STATUS"
+
+  13:
+    name: "Validation"
+    description: "Lookup lists and rules for fields"
+    example_reference_codes:
+      - "VAL_PRIORITY_LEVELS"
+      - "VAL_STATUS_CODES"
+      - "VAL_ASSET_CATEGORIES"
+      - "VAL_SEVERITY_LEVELS"
+
+  26:
+    name: "Object Type"
+    description: "Structure and behavior of custom objects"
+    example_reference_codes:
+      - "OBJ_CUSTOM_ASSET"
+      - "OBJ_SERVICE_CATALOG"
+      - "OBJ_CONFIGURATION_ITEM"
+      - "OBJ_VENDOR"
+
+  37:
+    name: "User Data Context"
+    description: "Shared user data for custom fields"
+    example_reference_codes:
+      - "UDC_USER_PROFILE"
+      - "UDC_USER_PREFERENCES"
+      - "UDC_TEAM_DATA"
+
+  39:
+    name: "Request Header Type"
+    description: "Fields and layout for request forms"
+    example_reference_codes:
+      - "REQ_HDR_INCIDENT"
+      - "REQ_HDR_CHANGE_REQUEST"
+      - "REQ_HDR_SERVICE_REQUEST"
+
+  58:
+    name: "Environment Group"
+    description: "Logical deployment target groups"
+    example_reference_codes:
+      - "ENVGRP_ALL_PROD"
+      - "ENVGRP_NON_PROD"
+      - "ENVGRP_DEVELOPMENT"
+
+functional_entities:
+  9:
+    name: "Workflow"
+    description: "Process flows for requests/projects"
+    example_reference_codes:
+      - "WF_INCIDENT_MGMT"
+      - "WF_CHANGE_REQUEST"
+      - "WF_APPROVAL_ROUTING"
+      - "WF_SERVICE_REQUEST"
+
+  17:
+    name: "Report Type"
+    description: "Parameterized reports"
+    example_reference_codes:
+      - "RPT_INCIDENT_STATUS"
+      - "RPT_PROJECT_METRICS"
+      - "RPT_RESOURCE_ALLOCATION"
+
+  19:
+    name: "Request Type"
+    description: "Request forms linked to workflows"
+    example_reference_codes:
+      - "REQ_TYPE_INCIDENT"
+      - "REQ_TYPE_CHANGE"
+      - "REQ_TYPE_SERVICE_REQUEST"
+
+  61:
+    name: "Overview Page Section"
+    description: "Overview page layout definitions"
+    example_reference_codes:
+      - "OPS_PROJECT_SUMMARY"
+      - "OPS_FINANCIALS"
+      - "OPS_RESOURCE_ALLOCATION"
+
+  470:
+    name: "Module (Dashboard)"
+    description: "Dashboard pages and layouts"
+    example_reference_codes:
+      - "DASH_INCIDENT_OVERVIEW"
+      - "DASH_PROJECT_STATUS"
+      - "DASH_EXECUTIVE_SUMMARY"
+
+  505:
+    name: "Data Source"
+    description: "SQL queries behind portlets"
+    example_reference_codes:
+      - "DS_INCIDENT_METRICS"
+      - "DS_PROJECT_STATUS"
+      - "DS_RESOURCE_CAPACITY"
+
+  509:
+    name: "Portlet Definition"
+    description: "Dashboard widgets"
+    example_reference_codes:
+      - "PORTLET_MY_INCIDENTS"
+      - "PORTLET_MY_TASKS"
+      - "PORTLET_STATUS_CHART"
+
+  521:
+    name: "Project Type"
+    description: "Project templates, policies, lifecycle"
+    example_reference_codes:
+      - "PROJ_TYPE_IT_PROJECT"
+      - "PROJ_TYPE_CONSTRUCTION"
+      - "PROJ_TYPE_SOFTWARE_DEV"
+
+  522:
+    name: "Workplan Template"
+    description: "Standard project task breakdowns"
+    example_reference_codes:
+      - "WPT_SOFTWARE_DEVELOPMENT"
+      - "WPT_DEPLOYMENT"
+      - "WPT_INFRASTRUCTURE_SETUP"
+
+  901:
+    name: "Program Type"
+    description: "Program-level structure"
+    example_reference_codes:
+      - "PROG_TYPE_DIGITAL_TRANSFORM"
+      - "PROG_TYPE_INFRASTRUCTURE"
+
+  903:
+    name: "Portfolio Type"
+    description: "Portfolio containers and hierarchy"
+    example_reference_codes:
+      - "PORT_TYPE_IT_PORTFOLIO"
+      - "PORT_TYPE_ENTERPRISE"
+
+  906:
+    name: "OData Data Source"
+    description: "OData-backed queries"
+    example_reference_codes:
+      - "ODATA_PROJECTS"
+      - "ODATA_RESOURCES"
+      - "ODATA_FINANCIALS"
+    note: "OData links defined for the OData data sources are not migrated"
+
+  907:
+    name: "Custom Menu"
+    description: "Custom UI menu entries"
+    example_reference_codes:
+      - "MENU_CUSTOM_REPORTS"
+      - "MENU_ADMIN_TOOLS"
+
+  908:
+    name: "Chatbot Intent"
+    description: "Chatbot intents"
+    example_reference_codes:
+      - "INTENT_STATUS_CHECK"
+      - "INTENT_CREATE_TICKET"
+    note: "Available for PPM 25.2 and later"
+
+  9900:
+    name: "PPM Integration SDK"
+    description: "PPM Integration SDK objects"
+    example_reference_codes:
+      - "SDK_JIRA_CONNECTOR"
+      - "SDK_SERVICENOW_INTEGRATION"

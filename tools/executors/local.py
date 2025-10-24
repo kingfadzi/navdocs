@@ -14,18 +14,17 @@ from ..deployment.utils import get_ppm_credentials
 class LocalExecutor(BaseExecutor):
     """Local kMigrator executor for testing (uses subprocess)."""
 
-    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
+    def extract(self, script_path, url, entity_id, reference_code, server_config=None):
         username, password = get_ppm_credentials(server_config)
 
+        # Build kMigrator command - referenceCode is now MANDATORY per OpenText spec
         cmd = [
             'bash', script_path, '-username', username, '-password', password,
-            '-url', url, '-action', 'Bundle', '-entityId', str(entity_id)
+            '-url', url, '-action', 'Bundle', '-entityId', str(entity_id),
+            '-referenceCode', reference_code
         ]
-        if reference_code:
-            cmd.extend(['-referenceCode', reference_code])
 
-        ref_info = f" ({reference_code})" if reference_code else " (ALL)"
-        print(f"Extracting entity {entity_id}{ref_info} from {url} (LOCAL)")
+        print(f"Extracting entity {entity_id} ({reference_code}) from {url} (LOCAL)")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(result.stdout)

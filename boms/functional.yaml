@@ -1,6 +1,7 @@
 # Functional BOM
 # Deploy SPECIFIC business logic entities (Workflows, Request Types, Reports, Dashboards)
-version: "2.0.60"
+version: "2.1.0"
+category: functional
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
@@ -8,14 +9,32 @@ change_request: "CR-12345"
 created_by: "your-name"
 description: "Test refactored Python code in pipeline"
 
+# Entities to deploy (each requires explicit reference_code)
+# See schemas/entity-types.yaml for valid entity IDs and reference code examples
+entities:
+  # Workflows (id: 9) - can have multiple workflows
+  - id: 9
+    reference_code: "WF_INCIDENT_MGMT"
+    name: "Incident Management Workflow"
+
+  - id: 9
+    reference_code: "WF_CHANGE_REQUEST"
+    name: "Change Request Workflow"
+
+  # Request Types (id: 19)
+  - id: 19
+    reference_code: "REQ_TYPE_INCIDENT"
+    name: "Incident Request Type"
+
+  # Report Types (id: 17)
+  - id: 17
+    reference_code: "RPT_INCIDENT_STATUS"
+    name: "Incident Status Report"
+
+  # Portlet Definitions (id: 509)
+  - id: 509
+    reference_code: "PORTLET_MY_INCIDENTS"
+    name: "My Incidents Portlet"
+
 # Rollback configuration (optional)
 rollback_pipeline_id: 12344
-
-# Entities to deploy
-entities:
-  - entity_id: 9
-    reference_code: "WF_INCIDENT_MGMT"
-    entity_type: "Workflow"
-    description: "Incident management workflow"
-
-# Triggering pipeline for test

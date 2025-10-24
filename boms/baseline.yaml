@@ -1,12 +1,51 @@
 # Baseline BOM
-# Deploy ALL foundational entities (Object Types, Request Headers, Validations, Commands, Environments)
-version: "1.0.59"
+# Deploy specific foundational entities (Object Types, Request Headers, Validations, Commands, Environments)
+version: "1.1.0"
+category: baseline
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
 created_by: "your-name"
 description: "Baseline entity sync for new project setup"
+
+# Entities to deploy (each requires explicit reference_code)
+# See schemas/entity-types.yaml for valid entity IDs and reference code examples
+entities:
+  # Object Types (id: 26)
+  - id: 26
+    reference_code: "OBJ_EXAMPLE_ASSET"
+    name: "Example Asset Object Type"
+
+  # Request Header Types (id: 39)
+  - id: 39
+    reference_code: "REQ_HDR_EXAMPLE_INCIDENT"
+    name: "Example Incident Request Header"
+
+  # Validations (id: 13)
+  - id: 13
+    reference_code: "VAL_EXAMPLE_PRIORITY"
+    name: "Example Priority Levels Validation"
+
+  # User Data Contexts (id: 37)
+  - id: 37
+    reference_code: "UDC_EXAMPLE_USER_PROFILE"
+    name: "Example User Profile Context"
+
+  # Special Commands (id: 11)
+  - id: 11
+    reference_code: "CMD_EXAMPLE_ASSIGN_OWNER"
+    name: "Example Assign Owner Command"
+
+  # Environments (id: 4)
+  - id: 4
+    reference_code: "ENV_EXAMPLE_PRODUCTION"
+    name: "Example Production Environment"
+
+  # Environment Groups (id: 58)
+  - id: 58
+    reference_code: "ENVGRP_EXAMPLE_ALL_PROD"
+    name: "Example Production Environment Group"
 
 # Rollback configuration (optional)
 rollback_pipeline_id: 12344
