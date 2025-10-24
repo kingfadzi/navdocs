@@ -99,6 +99,7 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 
 **For deep dive:**
 - [KEY_CONCEPTS.md](KEY_CONCEPTS.md) - Architecture, storage, executors, vault
+- [PIPELINE_ARCHITECTURE.md](PIPELINE_ARCHITECTURE.md) - Pipeline execution flow and stages
 - [KMIGRATOR_REFERENCE.md](KMIGRATOR_REFERENCE.md) - kMigrator flags and parameters
 
 ---
