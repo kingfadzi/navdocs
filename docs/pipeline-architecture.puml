@@ -1,0 +1,126 @@
+@startuml
+title PPM Deployment Pipeline Architecture
+
+skinparam activity {
+  ArrowColor #444
+  StartColor #99ccff
+  EndColor #ffcccc
+  BackgroundColor #f8f8f8
+  DiamondBackgroundColor #fff2cc
+  BorderColor #999
+}
+skinparam shadowing false
+skinparam defaultTextAlignment left
+
+partition "File Changes" {
+  start
+  :Developer commits to Git;
+  if (Which BOM changed?) then (baseline.yaml)
+    :Baseline BOM changed;
+    #lightblue:Trigger: baseline validation;
+  elseif (functional.yaml) then
+    :Functional BOM changed;
+    #lightgreen:Trigger: functional validation;
+  elseif (both) then
+    :Both BOMs changed;
+    #orchid:Trigger: both validations;
+  else (neither)
+    :No BOM changes;
+    stop
+  endif
+}
+
+partition "Main Pipeline (.gitlab-ci.yml)" {
+  :Validate BOM(s);
+  note right
+    - Check BOM syntax
+    - Governance rules
+    - Server configuration
+  end note
+
+  if (Validation passed?) then (yes)
+    :Generate child pipeline YAML;
+    note right
+      tools.config.pipeline
+      - Read BOM config
+      - Inject vault components
+      - Create child-pipeline.yml
+    end note
+
+    if (Both BOMs changed?) then (yes)
+      fork
+        :Trigger baseline child pipeline;
+      fork again
+        :Wait for baseline to complete;
+        :Trigger functional child pipeline;
+      end fork
+    else (single BOM)
+      :Trigger child pipeline;
+    endif
+  else (no)
+    :Validation failed;
+    stop
+  endif
+}
+
+partition "Vault Integration" #lightyellow {
+  :Fetch credentials from HashiCorp Vault;
+  note right
+    Per stage:
+    - Extract/Import: SSH + PPM
+    - Archive: S3 write
+  end note
+  :Export as environment variables;
+  :Inject into pipeline jobs;
+}
+
+partition "Child Pipeline (Extract -> Import -> Archive)" {
+  :EXTRACT STAGE;
+  :Vault injects SSH + PPM credentials;
+  :SSH to source PPM server;
+  :Run kMigratorExtract.sh;
+  :Download bundles to runner;
+  :Save as GitLab artifacts (1 week);
+  note right
+    bundles/*.xml
+    metadata.yaml
+  end note
+
+  :IMPORT STAGE (needs: extract);
+  :Vault injects SSH + PPM credentials;
+  :Download bundles from artifacts;
+  :SSH to target PPM server;
+  :Run kMigratorImport.sh with flags;
+
+  :ARCHIVE STAGE (needs: extract, import);
+  :Vault injects S3 write credentials;
+  :Create rollback archive ZIP;
+  :Upload to S3 (permanent);
+  :Save as GitLab artifacts (1 year);
+  note right
+    archive.zip
+    evidence.zip
+    ROLLBACK_MANIFEST.yaml
+  end note
+}
+
+partition "Artifact Storage" {
+  if (Storage location?) then (GitLab Artifacts)
+    :Store bundles (1 week);
+    :Store archives (1 year);
+    note right
+      Fast access for:
+      - Next pipeline stages
+      - Recent rollback
+    end note
+  else (S3)
+    :Store archives (permanent);
+    note right
+      Long-term rollback
+      (6+ months old)
+    end note
+  endif
+  stop
+}
+
+@enduml
