@@ -102,7 +102,7 @@ def extract_command(bom_file, deployment_type):
         'change_request': bom.get('change_request', 'N/A'),
         'extracted_at': datetime.now().isoformat(),
         'i18n_mode': 'none' if category == 'baseline' else 'charset',
-        'refdata_mode': 'nochange'
+        'refdata_mode': 'install' if category == 'baseline' else 'nochange'
     }
     save_deployment_metadata(metadata, f"bundles/{deployment_type}-metadata.yaml")
     print(f"\n[OK] Extracted {len(bundles)} bundles for {deployment_type}")
