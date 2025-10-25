@@ -3,7 +3,7 @@
 version: "1.1.2"
 category: baseline
 profile: baseline
-source_server: test-ppm-useast
+source_server: staging-ppm-useast
 target_server: prod-ppm-useast
 change_request: "CR-12345"
 created_by: "your-name"
