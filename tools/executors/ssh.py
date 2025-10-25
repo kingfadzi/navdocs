@@ -11,45 +11,27 @@ import os
 class RemoteExecutor:
     """SSH remote executor using sshpass."""
 
+    SSH_OPTIONS = ['-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null']
+
     def _get_credentials(self, ssh_config):
-        """
-        Get SSH credentials from environment variables.
-
-        Args:
-            ssh_config: Server configuration dict with ssh_env_vars section
-
-        Returns:
-            Tuple of (username, password, username_env_name, password_env_name)
-        """
-        # Get credential env var names from config (NO DEFAULTS - must be explicit)
+        """Returns (username, password, username_env_name, password_env_name)."""
         ssh_vars = ssh_config.get('ssh_env_vars', {})
         username_env = ssh_vars.get('username')
         password_env = ssh_vars.get('password')
 
-        # Fail fast if credential env vars are not configured
         if not username_env or not password_env:
             raise ValueError(
-                "ERROR: SSH credential environment variable names not configured.\n"
-                "Required in server config:\n"
-                "  ssh_env_vars:\n"
-                "    username: 'SSH_USERNAME'\n"
-                "    password: 'SSH_PASSWORD'\n"
-                "Add to config/deployment-config.yaml:\n"
-                "  servers:\n"
-                "    your-server:\n"
-                "      ssh_env_vars:\n"
-                "        username: 'YOUR_SSH_USERNAME_ENV'\n"
-                "        password: 'YOUR_SSH_PASSWORD_ENV'"
+                f"ERROR: Missing ssh_env_vars in server config.\n"
+                f"Add to deployment-config.yaml: ssh_env_vars: {{username: 'ENV_VAR', password: 'ENV_VAR'}}"
             )
 
-        # Read credentials from configured env vars
         username = os.environ.get(username_env)
         password = os.environ.get(password_env)
 
         return username, password, username_env, password_env
 
-    def ssh_exec(self, ssh_config, command, env=None):
-        """Execute command on remote server via SSH."""
+    def _setup_connection(self, ssh_config):
+        """Extract connection parameters and setup environment."""
         ssh_host = ssh_config['ssh_host']
         ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
         ssh_port = ssh_config.get('ssh_port', 22)
@@ -57,21 +39,32 @@ class RemoteExecutor:
         if not ssh_user or not ssh_password:
             raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
 
-        if env is None:
-            env = os.environ.copy()
+        env = os.environ.copy()
         env['SSHPASS'] = ssh_password
 
-        ssh_cmd = [
-            'sshpass', '-e',
-            'ssh',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+        return ssh_host, ssh_user, ssh_port, env
+
+    def _run_command(self, cmd, env, error_message):
+        """Run subprocess command with error handling."""
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"{error_message} (exit {result.returncode}): {result.stderr}")
+        return result.stdout
+
+    def ssh_exec(self, ssh_config, command, env=None):
+        """Execute command on remote server via SSH."""
+        ssh_host, ssh_user, ssh_port, conn_env = self._setup_connection(ssh_config)
+
+        if env is not None:
+            conn_env.update(env)
+
+        ssh_cmd = ['sshpass', '-e', 'ssh'] + self.SSH_OPTIONS + [
             '-p', str(ssh_port),
             f'{ssh_user}@{ssh_host}',
             command
         ]
 
-        result = subprocess.run(ssh_cmd, env=env, capture_output=True, text=True)
+        result = subprocess.run(ssh_cmd, env=conn_env, capture_output=True, text=True)
         return result.stdout, result.stderr, result.returncode
 
     def ssh_exec_check(self, ssh_config, command, env=None):
@@ -90,18 +83,9 @@ class RemoteExecutor:
 
     def build_ssh_cmd(self, ssh_config, remote_command):
         """Build sshpass + ssh command list."""
-        ssh_host = ssh_config['ssh_host']
-        ssh_user, _, username_env, _ = self._get_credentials(ssh_config)
-        ssh_port = ssh_config.get('ssh_port', 22)
+        ssh_host, ssh_user, ssh_port, _ = self._setup_connection(ssh_config)
 
-        if not ssh_user:
-            raise ValueError(f"SSH user not found: {username_env} required")
-
-        return [
-            'sshpass', '-e',
-            'ssh',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+        return ['sshpass', '-e', 'ssh'] + self.SSH_OPTIONS + [
             '-p', str(ssh_port),
             f'{ssh_user}@{ssh_host}',
             remote_command
@@ -109,59 +93,27 @@ class RemoteExecutor:
 
     def scp_download(self, ssh_config, remote_path, local_path):
         """Download file from remote server via SCP."""
-        ssh_host = ssh_config['ssh_host']
-        ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
-        ssh_port = ssh_config.get('ssh_port', 22)
+        ssh_host, ssh_user, ssh_port, env = self._setup_connection(ssh_config)
 
-        if not ssh_user or not ssh_password:
-            raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
-
-        env = os.environ.copy()
-        env['SSHPASS'] = ssh_password
-
-        scp_cmd = [
-            'sshpass', '-e',
-            'scp',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+        scp_cmd = ['sshpass', '-e', 'scp'] + self.SSH_OPTIONS + [
             '-P', str(ssh_port),
             f'{ssh_user}@{ssh_host}:{remote_path}',
             local_path
         ]
 
-        result = subprocess.run(scp_cmd, env=env, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"SCP download failed (exit {result.returncode}): {result.stderr}")
-
-        return result.stdout
+        return self._run_command(scp_cmd, env, "SCP download failed")
 
     def scp_upload(self, ssh_config, local_path, remote_path):
         """Upload file to remote server via SCP."""
-        ssh_host = ssh_config['ssh_host']
-        ssh_user, ssh_password, username_env, password_env = self._get_credentials(ssh_config)
-        ssh_port = ssh_config.get('ssh_port', 22)
+        ssh_host, ssh_user, ssh_port, env = self._setup_connection(ssh_config)
 
-        if not ssh_user or not ssh_password:
-            raise ValueError(f"SSH credentials not found: {username_env} and {password_env} required")
-
-        env = os.environ.copy()
-        env['SSHPASS'] = ssh_password
-
-        scp_cmd = [
-            'sshpass', '-e',
-            'scp',
-            '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null',
+        scp_cmd = ['sshpass', '-e', 'scp'] + self.SSH_OPTIONS + [
             '-P', str(ssh_port),
             local_path,
             f'{ssh_user}@{ssh_host}:{remote_path}'
         ]
 
-        result = subprocess.run(scp_cmd, env=env, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"SCP upload failed (exit {result.returncode}): {result.stderr}")
-
-        return result.stdout
+        return self._run_command(scp_cmd, env, "SCP upload failed")
 
 
 def create_remote_executor():

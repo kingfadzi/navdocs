@@ -7,51 +7,24 @@ import subprocess
 import glob
 import os
 
-# Import utilities - handle both direct execution and package import
-try:
-    from executors.base import BaseExecutor
-except ImportError:
-    from tools.executors.base import BaseExecutor
-
-try:
-    from deployment.utils import get_ppm_credentials
-except ImportError:
-    from tools.deployment.utils import get_ppm_credentials
+from .base import BaseExecutor
+from ..deployment.utils import get_ppm_credentials
 
 
 class LocalExecutor(BaseExecutor):
-    """
-    Local kMigrator executor (mock mode).
+    """Local kMigrator executor for testing (uses subprocess)."""
 
-    Executes kMigrator scripts locally using subprocess.
-    Used for testing and development with mock scripts.
-    """
-
-    def extract(self, script_path, url, entity_id, reference_code=None, server_config=None):
-        """
-        Extract entity locally (mock mode).
-
-        Args:
-            script_path: Path to kMigrator extract script
-            url: PPM server URL
-            entity_id: Entity ID to extract
-            reference_code: Optional reference code for specific entity
-            server_config: Optional server configuration dict (for credential resolution)
-
-        Returns:
-            Local file path to extracted bundle
-        """
+    def extract(self, script_path, url, entity_id, reference_code, server_config=None):
         username, password = get_ppm_credentials(server_config)
 
+        # Build kMigrator command - referenceCode is now MANDATORY per OpenText spec
         cmd = [
             'bash', script_path, '-username', username, '-password', password,
-            '-url', url, '-action', 'Bundle', '-entityId', str(entity_id)
+            '-url', url, '-action', 'Bundle', '-entityId', str(entity_id),
+            '-referenceCode', reference_code
         ]
-        if reference_code:
-            cmd.extend(['-referenceCode', reference_code])
 
-        print(f"Extracting entity {entity_id}" + (f" ({reference_code})" if reference_code else " (ALL)") + f" from {url} (LOCAL)")
-        print(f"Command: {' '.join(cmd)}\n")
+        print(f"Extracting entity {entity_id} ({reference_code}) from {url} (LOCAL)")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(result.stdout)
@@ -67,21 +40,6 @@ class LocalExecutor(BaseExecutor):
         return files[0] if files else None
 
     def import_bundle(self, script_path, url, bundle_file, flags, i18n, refdata, server_config=None):
-        """
-        Import bundle locally (mock mode).
-
-        Args:
-            script_path: Path to kMigrator import script
-            url: PPM server URL
-            bundle_file: Local file path to bundle
-            flags: 25-character kMigrator flag string
-            i18n: i18n mode (e.g., 'charset', 'none')
-            refdata: Reference data mode (e.g., 'nochange')
-            server_config: Optional server configuration dict (for credential resolution)
-
-        Returns:
-            None (prints output)
-        """
         username, password = get_ppm_credentials(server_config)
 
         cmd = [
@@ -90,7 +48,6 @@ class LocalExecutor(BaseExecutor):
             '-i18n', i18n, '-refdata', refdata, '-flags', flags
         ]
         print(f"Importing {bundle_file} to {url} (LOCAL)")
-        print(f"Command: {' '.join(cmd)}\n")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         print(result.stdout)

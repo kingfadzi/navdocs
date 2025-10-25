@@ -11,54 +11,44 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Import from deployment package modules
-try:
-    from deployment.utils import (
-        load_yaml, load_config,
-        save_deployment_metadata, load_deployment_metadata,
-        get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials,
-        get_ppm_credentials
-    )
-    from deployment.archive import (
-        archive_deployment, create_evidence_package,
-        create_complete_snapshot, create_rollback_manifest,
-        print_gitlab_artifact_info
-    )
-    from deployment import rollback
-except ImportError:
-    from tools.deployment.utils import (
-        load_yaml, load_config,
-        save_deployment_metadata, load_deployment_metadata,
-        get_flag_string, validate_bom_before_action,
-        get_vault_config_command, apply_default_credentials,
-        get_ppm_credentials
-    )
-    from tools.deployment.archive import (
-        archive_deployment, create_evidence_package,
-        create_complete_snapshot, create_rollback_manifest,
-        print_gitlab_artifact_info
-    )
-    from tools.deployment import rollback
+from .utils import (
+    load_yaml, load_config,
+    save_deployment_metadata, load_deployment_metadata,
+    get_flag_string, validate_bom_before_action,
+    get_vault_config_command, apply_default_credentials,
+    get_ppm_credentials
+)
+from .archive import (
+    archive_deployment, create_evidence_package,
+    create_complete_snapshot, create_rollback_manifest,
+    print_gitlab_artifact_info
+)
+from . import rollback
+from ..executors import get_executor
 
-try:
-    from executors import get_executor
-except ImportError:
-    from tools.executors import get_executor
+
+def _print_phase(phase_num, phase_name, deployment_type=None):
+    """Helper to print phase headers."""
+    if deployment_type:
+        print(f"\n{'='*60}")
+        print(f"PHASE {phase_num}: {phase_name} ({deployment_type.upper()})")
+        print(f"{'='*60}")
+    else:
+        print(f"\n{'='*60}")
+        print(f"{phase_name}")
+        print(f"{'='*60}")
 
 
 def extract_command(bom_file, deployment_type):
     """PHASE 1: Extract entities and save metadata."""
-    print("=" * 60)
-    print(f"PHASE 1: EXTRACT ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(1, "EXTRACT", deployment_type)
     root = Path(__file__).parent.parent.parent
     bom = load_yaml(bom_file)
     profile_name = bom['profile']
     source_server = bom['source_server']
     target_server = bom['target_server']
+    category = bom.get('category', deployment_type)  # Use category from BOM
 
-    is_baseline = 'baseline' in profile_name.lower()
     config = load_config()
     source_url = config['servers'][source_server]['url']
     source_server_config = config['servers'][source_server]
@@ -76,25 +66,31 @@ def extract_command(bom_file, deployment_type):
     print(f"Storage: {storage_mode.upper()}")
     print(f"Flags: {flags}\n")
 
+    # Unified BOM-centric extraction (both baseline and functional use same structure)
     bundles = []
-    if is_baseline:
-        profile = load_yaml(root / "profiles" / f"{profile_name}.yaml")
-        print(f"Extracting {len(profile['entities'])} baseline entity types...\n")
-        for entity in profile['entities']:
-            # Pass server_config for credential resolution
-            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
-            bundle = executor.extract(extract_script, source_url, entity['id'], None, source_server_config)
-            bundles.append(bundle)
-    else:
-        print(f"Extracting {len(bom['entities'])} functional entities...\n")
-        for entity in bom['entities']:
-            # Pass server_config for credential resolution
-            # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
-            bundle = executor.extract(extract_script, source_url, entity['entity_id'], entity['reference_code'], source_server_config)
-            bundles.append(bundle)
+    entities = bom.get('entities', [])
+
+    if not entities:
+        print("ERROR: No entities found in BOM. BOM must contain 'entities' list.")
+        sys.exit(1)
+
+    print(f"Extracting {len(entities)} entities from {source_server}...\n")
+    for entity in entities:
+        # Both baseline and functional now use same BOM structure: id + reference_code
+        entity_id = entity['id']
+        reference_code = entity['reference_code']  # Now mandatory per OpenText spec
+        entity_name = entity.get('name', reference_code)  # Optional name for logging
+
+        print(f"  [{entity_id}] {entity_name} ({reference_code})")
+
+        # Pass server_config for credential resolution
+        # Returns local file path (both LocalExecutor and RemoteKMigratorExecutor)
+        bundle = executor.extract(extract_script, source_url, entity_id, reference_code, source_server_config)
+        bundles.append(bundle)
 
     metadata = {
         'deployment_type': deployment_type,
+        'category': category,  # baseline or functional
         'profile': profile_name,
         'source_server': source_server,
         'target_server': target_server,
@@ -105,19 +101,17 @@ def extract_command(bom_file, deployment_type):
         'bom_version': bom.get('version', 'unknown'),
         'change_request': bom.get('change_request', 'N/A'),
         'extracted_at': datetime.now().isoformat(),
-        'i18n_mode': 'none' if is_baseline else 'charset',
+        'i18n_mode': 'none' if category == 'baseline' else 'charset',
         'refdata_mode': 'nochange'
     }
     save_deployment_metadata(metadata, f"bundles/{deployment_type}-metadata.yaml")
-    print(f"\n✓ Extracted {len(bundles)} bundles for {deployment_type}")
+    print(f"\n[OK] Extracted {len(bundles)} bundles for {deployment_type}")
     print("=" * 60)
 
 
 def import_command(bom_file, deployment_type):
     """PHASE 2: Import bundles to target server."""
-    print("=" * 60)
-    print(f"PHASE 2: IMPORT ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(2, "IMPORT", deployment_type)
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     target_server = metadata['target_server']
     flags = metadata['flags']
@@ -144,15 +138,13 @@ def import_command(bom_file, deployment_type):
         # Pass server_config for credential resolution
         executor.import_bundle(import_script, target_url, bundle, flags, i18n_mode, refdata_mode, target_server_config)
 
-    print(f"\n✓ Imported {len(bundles)} bundles for {deployment_type}")
+    print(f"\n[OK] Imported {len(bundles)} bundles for {deployment_type}")
     print("=" * 60)
 
 
 def archive_command(bom_file, deployment_type):
     """PHASE 3: Archive and create evidence."""
-    print("=" * 60)
-    print(f"PHASE 3: ARCHIVE ({deployment_type.upper()})")
-    print("=" * 60)
+    _print_phase(3, "ARCHIVE", deployment_type)
 
     metadata = load_deployment_metadata(f"bundles/{deployment_type}-metadata.yaml")
     root = Path(__file__).parent.parent.parent
@@ -196,10 +188,7 @@ def archive_command(bom_file, deployment_type):
 
 def validate_command(bom_file):
     """Validate BOM and check environment is ready for deployment."""
-    print("=" * 60)
-    print("VALIDATING DEPLOYMENT PREREQUISITES")
-    print("=" * 60)
-    print()
+    _print_phase(None, "VALIDATING DEPLOYMENT PREREQUISITES")
 
     # 1. Validate BOM file
     print("[1/3] Validating BOM file...")
@@ -217,12 +206,12 @@ def validate_command(bom_file):
     if source not in config['servers']:
         print(f"✗ ERROR: Source server '{source}' not found in configuration")
         sys.exit(1)
-    print(f"  ✓ Source server '{source}' found")
+    print(f"  [OK] Source server '{source}' found")
 
     if target not in config['servers']:
         print(f"✗ ERROR: Target server '{target}' not found in configuration")
         sys.exit(1)
-    print(f"  ✓ Target server '{target}' found")
+    print(f"  [OK] Target server '{target}' found")
     print()
 
     # 3. Check required credentials are set
@@ -250,24 +239,17 @@ def validate_command(bom_file):
 
     print()
     print("=" * 60)
-    print("✓ ALL VALIDATION CHECKS PASSED")
+    print("[OK] ALL VALIDATION CHECKS PASSED")
     print("=" * 60)
     print()
     print(f"Ready to deploy from {source} to {target}")
-    print(f"Run: python3 -m tools.deployment.orchestrator deploy --type {bom.get('profile', 'unknown')} --bom {bom_file}")
+    print(f"Run: python3 -m tools.deployment.orchestrator deploy --type {bom.get('category', 'unknown')} --bom {bom_file}")
 
 
 def deploy_command(bom_file, deployment_type):
-    """
-    One-shot deployment that runs the full extract -> import -> archive sequence.
-    """
-    # First, validate the BOM file.
+    """One-shot deployment that runs the full extract -> import -> archive sequence."""
     validate_bom_before_action(bom_file)
-
-    print("=" * 60)
-    print(f"DEPLOYMENT ({deployment_type.upper()})")
-    print("=" * 60)
-    print()
+    _print_phase(None, f"DEPLOYMENT ({deployment_type.upper()})")
 
     # Phase 1: Extract
     extract_command(bom_file, deployment_type)

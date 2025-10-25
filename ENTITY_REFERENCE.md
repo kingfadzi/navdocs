@@ -1,18 +1,21 @@
 # PPM Entity Reference
 
-> **Source of Truth:** Entity definitions are maintained in profile configurations.
-> Always verify against:
-> - [profiles/baseline.yaml](profiles/baseline.yaml) - Baseline entities
-> - [profiles/functional-cd.yaml](profiles/functional-cd.yaml) - Functional entities
+> **Source of Truth:** Entity deployment lists are defined in BOM files, validated by schemas.
 >
-> **Official Documentation:** Entity IDs are defined in OpenText PPM documentation:
-> - [kMigratorExtract.sh - Entity Type IDs](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm)
+> **Architecture:**
+> - **BOMs** ([boms/](boms/)) - Define WHAT entities to deploy
+> - **Profiles** ([profiles/](profiles/)) - Define HOW to deploy (flags only)
+> - **Schemas** ([schemas/](schemas/)) - Validate entity types allowed per category
+>
+> **References:**
+> - [schemas/entity-types.yaml](schemas/entity-types.yaml) - Internal entity type reference
+> - [OpenText PPM Documentation - Entity Type IDs](https://admhelp.microfocus.com/ppm/en/25.1-25.3/Help/Content/SA/InstallAdmin/122100_InstallAdmin_Server.htm)
 
 ---
 
 ## Understanding Baseline vs Functional Entities
 
-### Baseline (Infrastructure) Entities - 7 Total
+### Baseline (Infrastructure) Entity Types - 7 Available Types
 
 **Purpose:** Data structure, field definitions, and core infrastructure that must exist BEFORE any functional entities can be imported.
 
@@ -31,7 +34,7 @@
 
 ---
 
-### Functional (Business Logic) Entities - 15 Total
+### Functional (Business Logic) Entity Types - 15 Available Types
 
 **Purpose:** Business processes, workflows, reporting, and customizations that operate ON TOP OF the baseline infrastructure.
 
@@ -65,7 +68,7 @@ Attempting to deploy functional entities before baseline will result in import f
 
 ---
 
-## Baseline Entities (Infrastructure - 7 entities)
+## Baseline Entity Types (Infrastructure - 7 types available)
 
 Must exist before functional deployments. Deployed quarterly or on-demand.
 
@@ -95,7 +98,7 @@ Must exist before functional deployments. Deployed quarterly or on-demand.
 
 ---
 
-## Functional Entities (Business Logic - 15 entities)
+## Functional Entity Types (Business Logic - 15 types available)
 
 Deploy frequently once baseline is stable. Continuous deployment pattern.
 
@@ -133,12 +136,13 @@ Deploy frequently once baseline is stable. Continuous deployment pattern.
 
 ## Updating This Reference
 
-When modifying entity definitions:
+When adding new entity types to the system:
 
-1. **Update the profile YAML first** ([baseline.yaml](profiles/baseline.yaml) or [functional-cd.yaml](profiles/functional-cd.yaml))
-2. **Update this reference file** to match the profile changes
-3. **Verify entity count** matches profile (7 baseline, 15 functional)
-4. **Spot-check** descriptions and IDs against profiles
+1. **Update schemas** ([schemas/bom-baseline-schema.json](schemas/bom-baseline-schema.json) or [schemas/bom-functional-schema.json](schemas/bom-functional-schema.json)) to allow new entity IDs
+2. **Update schemas/entity-types.yaml** with new entity type documentation
+3. **Update this reference file** to include new entity type descriptions
+4. **Update profile flags** if new replacement flags are needed for the entity type
+5. **Verify entity type count** (7 baseline types, 15 functional types)
 
 ---
 
@@ -166,16 +170,16 @@ When modifying entity definitions:
 
 1. **First - Baseline Deployment:**
    ```bash
-   python3 tools/deploy.py deploy --type baseline --bom boms/baseline.yaml
+   python3 -m tools.deployment.orchestrator deploy --type baseline --bom boms/baseline.yaml
    ```
-   - Deploys infrastructure (7 entities)
+   - Deploys specific infrastructure entities listed in BOM
    - Adds missing environments, security groups, statuses
    - Creates foundation for functional entities
 
 2. **Then - Functional Deployment:**
    ```bash
-   python3 tools/deploy.py deploy --type functional --bom boms/functional.yaml
+   python3 -m tools.deployment.orchestrator deploy --type functional --bom boms/functional.yaml
    ```
-   - Deploys business logic (15 entities)
+   - Deploys specific business logic entities listed in BOM
    - References baseline entities
    - Fails if baseline not present (intentional safety check)
