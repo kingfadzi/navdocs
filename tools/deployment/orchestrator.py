@@ -102,7 +102,7 @@ def extract_command(bom_file, deployment_type):
         'change_request': bom.get('change_request', 'N/A'),
         'extracted_at': datetime.now().isoformat(),
         'i18n_mode': 'none' if category == 'baseline' else 'charset',
-        'refdata_mode': 'nochange'
+        'refdata_mode': 'install' if category == 'baseline' else 'nochange'
     }
     save_deployment_metadata(metadata, f"bundles/{deployment_type}-metadata.yaml")
     print(f"\n[OK] Extracted {len(bundles)} bundles for {deployment_type}")
@@ -204,12 +204,12 @@ def validate_command(bom_file):
     target = bom['target_server']
 
     if source not in config['servers']:
-        print(f"✗ ERROR: Source server '{source}' not found in configuration")
+        print(f"[ERROR] Source server '{source}' not found in configuration")
         sys.exit(1)
     print(f"  [OK] Source server '{source}' found")
 
     if target not in config['servers']:
-        print(f"✗ ERROR: Target server '{target}' not found in configuration")
+        print(f"[ERROR] Target server '{target}' not found in configuration")
         sys.exit(1)
     print(f"  [OK] Target server '{target}' found")
     print()
@@ -226,7 +226,7 @@ def validate_command(bom_file):
     try:
         get_ppm_credentials(source_config)
     except SystemExit:
-        print(f"✗ Source server credentials check failed")
+        print(f"[ERROR] Source server credentials check failed")
         sys.exit(1)
 
     # Check target server credentials
@@ -234,7 +234,7 @@ def validate_command(bom_file):
     try:
         get_ppm_credentials(target_config)
     except SystemExit:
-        print(f"✗ Target server credentials check failed")
+        print(f"[ERROR] Target server credentials check failed")
         sys.exit(1)
 
     print()
