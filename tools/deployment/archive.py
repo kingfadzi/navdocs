@@ -196,33 +196,40 @@ def _create_snapshot_manifest(snapshot_dir, pipeline_id, deployment_type, metada
 
 
 def _upload_snapshot_to_s3(snapshot_dir, pipeline_id, config):
-    """Upload snapshot to S3 and cleanup."""
+    """Upload snapshot to S3 and cleanup. Continues gracefully if S3 unavailable."""
     storage_mode = config['deployment'].get('storage_backend', 'local')
 
     if storage_mode != 's3':
         print(f"\nLocal mode: Snapshot at {snapshot_dir}")
         return None
 
-    storage = get_storage_backend(config)
-    s3_prefix = f"snapshots/{pipeline_id}"
-    bucket = config['s3']['bucket_name']
+    try:
+        storage = get_storage_backend(config)
+        s3_prefix = f"snapshots/{pipeline_id}"
+        bucket = config['s3']['bucket_name']
 
-    print(f"\nUploading to S3: s3://{bucket}/{s3_prefix}/")
+        print(f"\nUploading to S3: s3://{bucket}/{s3_prefix}/")
 
-    uploaded_count = 0
-    for file_path in snapshot_dir.rglob('*'):
-        if file_path.is_file():
-            relative_path = file_path.relative_to(snapshot_dir)
-            s3_key = f"{s3_prefix}/{relative_path}"
-            storage.upload_file(file_path, s3_key)
-            uploaded_count += 1
+        uploaded_count = 0
+        for file_path in snapshot_dir.rglob('*'):
+            if file_path.is_file():
+                relative_path = file_path.relative_to(snapshot_dir)
+                s3_key = f"{s3_prefix}/{relative_path}"
+                storage.upload_file(file_path, s3_key)
+                uploaded_count += 1
 
-    s3_snapshot_url = f"s3://{bucket}/{s3_prefix}/"
-    print(f"[OK] Uploaded {uploaded_count} files to {s3_snapshot_url}")
+        s3_snapshot_url = f"s3://{bucket}/{s3_prefix}/"
+        print(f"[OK] Uploaded {uploaded_count} files to {s3_snapshot_url}")
 
-    shutil.rmtree(snapshot_dir)
-    print("Cleaned up temporary directory")
-    return s3_snapshot_url
+        shutil.rmtree(snapshot_dir)
+        print("Cleaned up temporary directory")
+        return s3_snapshot_url
+
+    except Exception as e:
+        print(f"\nWARNING: S3 upload failed: {e}")
+        print(f"Snapshot kept at: {snapshot_dir}")
+        print("Deployment will continue (rollback available via GitLab artifacts)")
+        return None
 
 
 def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, archive_path, evidence_path, config):

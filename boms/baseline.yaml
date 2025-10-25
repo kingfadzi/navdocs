@@ -1,10 +1,10 @@
 # Baseline BOM
 # Deploy specific foundational entities (Object Types, Request Headers, Validations, Commands, Environments)
-version: "1.1.3"
+version: "1.1.4"
 category: baseline
 profile: baseline
-source_server: staging-ppm-useast
-target_server: prod-ppm-useast
+source_server: dev-ppm-useast
+target_server: test-ppm-useast
 change_request: "CR-12345"
 created_by: "your-name"
 description: "Baseline entity sync for new project setup"
