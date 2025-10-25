@@ -145,8 +145,8 @@ python3 -m tools.config.flags functional-cd
 1. **BOM loaded** from YAML file
 2. **Category detected** (baseline or functional)
 3. **Schema selected** based on category
-   - Baseline → `schemas/bom-baseline-schema.json`
-   - Functional → `schemas/bom-functional-schema.json`
+   - Baseline -> `schemas/bom-baseline-schema.json`
+   - Functional -> `schemas/bom-functional-schema.json`
 4. **Validation runs** using JSON Schema library
 5. **Errors reported** with exact path to problem
 
@@ -156,12 +156,12 @@ python3 -m tools.config.flags functional-cd
 python3 -m tools.config.validation --file boms/functional.yaml
 
 # Output (valid):
-✓ [OK] BOM is valid
+[OK] BOM is valid
   - Schema validation: PASSED
   - Governance rules: PASSED
 
 # Output (invalid):
-✗ [FAILED] BOM validation failed
+[FAILED] BOM validation failed
   - Schema validation failed at 'entities -> 0 -> reference_code':
     'reference_code' is a required property
 ```
