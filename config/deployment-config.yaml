@@ -13,40 +13,12 @@ deployment:
   archive_dir: "./archives"
   storage_backend: "s3"  # S3 storage (bundles go directly: PPM → S3 → PPM)
 
-# Vault Component Provider Registry
-# Defines pluggable vault secret retrieval components with different parameter mappings
-vault_component_providers:
-  # Standard vault-secret-fetcher component (v1.x - deprecated)
-  # Commented out during migration to CSM v2.0.0
-  # standard:
-  #   component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
-  #   component_version: "v1.0.4"
-  #   parameter_mappings:
-  #     anchor_name: "anchor_name"       # Our internal name → Component's parameter name
-  #     role: "vault_role"               # Our internal name → Component's parameter name
-  #     secret_paths: "vault_secret_paths"  # Our internal name → Component's parameter name
-
-  # CSM vault retriever (v2.0.0 - active)
-  # BREAKING CHANGE: Renamed parameters (vault_role → csm_role, vault_secret_paths → csm_secret_urls)
-  csm:
-    component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
-    component_version: "2.0.0"
-    parameter_mappings:
-      anchor_name: "anchor_name"
-      role: "csm_role"               # CSM uses 'csm_role' instead of 'vault_role'
-      secret_paths: "csm_secret_urls"  # CSM uses 'csm_secret_urls' instead of 'vault_secret_paths'
-
-  # Example: HashiCorp Vault direct component
-  # hashicorp:
-  #   component_url: "gitlab.com/components/vault/hashicorp-vault-fetch"
-  #   component_version: "v3.1.0"
-  #   parameter_mappings:
-  #     anchor_name: "output_anchor"
-  #     role: "vault_approle"
-  #     secret_paths: "secret_path_list"
-
-# Global default vault component provider (can be overridden per server or S3)
-vault_component_provider: "csm"
+# CSM Vault Secret Fetcher Component
+# This system uses OpenText CSM vault component exclusively for secret management.
+# Component parameters: anchor_name, csm_role, csm_secret_urls
+csm:
+  component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
+  component_version: "2.0.0"
 
 s3:
   bucket_name: "ppm-deployment-bundles"

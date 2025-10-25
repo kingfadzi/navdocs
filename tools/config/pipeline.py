@@ -4,40 +4,23 @@ import sys
 import argparse
 
 # This script generates a dynamic GitLab CI child pipeline by populating a template.
+# Uses OpenText CSM vault component exclusively for secret management.
 
 def load_yaml(file_path):
     with open(file_path, 'r') as f:
         return yaml.safe_load(f)
 
 
-def get_vault_provider(server_or_s3_config, deployment_config):
-    # Check for provider override in server/s3 config
-    provider_name = server_or_s3_config.get('vault_component_provider')
-
-    # Fall back to global default
-    if not provider_name:
-        provider_name = deployment_config.get('vault_component_provider', 'standard')
-
-    # Get provider config
-    providers = deployment_config.get('vault_component_providers', {})
-    if provider_name not in providers:
-        print(f"Error: Vault component provider '{provider_name}' not found in vault_component_providers", file=sys.stderr)
-        print(f"Available providers: {list(providers.keys())}", file=sys.stderr)
-        sys.exit(1)
-
-    return providers[provider_name]
-
-
-def generate_component_include(provider_config, anchor_name, vault_role_name, vault_secret_path):
-    component_url = provider_config['component_url']
-    component_version = provider_config['component_version']
-    param_mappings = provider_config['parameter_mappings']
+def generate_component_include(csm_config, anchor_name, vault_role_name, vault_secret_path):
+    """Generate CSM vault component include with hardcoded CSM parameter names."""
+    component_url = csm_config['component_url']
+    component_version = csm_config['component_version']
 
     return f"""  - component: {component_url}@{component_version}
     inputs:
-      {param_mappings['anchor_name']}: '{anchor_name}'
-      {param_mappings['role']}: '{vault_role_name}'
-      {param_mappings['secret_paths']}: '["{vault_secret_path}"]'
+      anchor_name: '{anchor_name}'
+      csm_role: '{vault_role_name}'
+      csm_secret_urls: '["{vault_secret_path}"]'
 """
 
 def generate_vault_references(vault_configs):
@@ -49,15 +32,15 @@ def generate_vault_references(vault_configs):
 
     return "\n".join(references)
 
-def _add_vault_includes(vault_role_configs, vault_provider):
-    """Generate vault component includes for multiple vault roles."""
+def _add_vault_includes(vault_role_configs, csm_config):
+    """Generate CSM vault component includes for multiple vault roles."""
     vault_includes = ""
     for role_config in vault_role_configs:
         role_name = role_config['name']
         secret_path = role_config['path']
         path_suffix = secret_path.split('/')[-1]
         anchor_name = f'vault-{role_name}-{path_suffix}'
-        vault_includes += generate_component_include(vault_provider, anchor_name, role_name, secret_path)
+        vault_includes += generate_component_include(csm_config, anchor_name, role_name, secret_path)
     return vault_includes
 
 
@@ -82,20 +65,18 @@ def generate_pipeline(bom_file_path, config_file_path, template_file_path):
     target_server_config = deployment_config['servers'][target_server_name]
     s3_config = deployment_config['s3']
 
-    # Get vault providers and roles
-    source_provider = get_vault_provider(source_server_config, deployment_config)
-    target_provider = get_vault_provider(target_server_config, deployment_config)
-    s3_provider = get_vault_provider(s3_config, deployment_config)
+    # Get CSM component configuration
+    csm_config = deployment_config['csm']
 
     source_vault_roles = source_server_config['vault_roles']
     target_vault_roles = target_server_config['vault_roles']
     s3_vault_roles = s3_config['vault_roles']
 
-    # Generate vault component includes
-    vault_includes = "# Vault component includes for dynamic child pipeline\ninclude:\n"
-    vault_includes += _add_vault_includes(source_vault_roles, source_provider)
-    vault_includes += _add_vault_includes(target_vault_roles, target_provider)
-    vault_includes += _add_vault_includes(s3_vault_roles, s3_provider)
+    # Generate CSM vault component includes
+    vault_includes = "# CSM vault component includes for dynamic child pipeline\ninclude:\n"
+    vault_includes += _add_vault_includes(source_vault_roles, csm_config)
+    vault_includes += _add_vault_includes(target_vault_roles, csm_config)
+    vault_includes += _add_vault_includes(s3_vault_roles, csm_config)
     vault_includes += "\n"
 
     # --- Step 3: Generate Vault References for Each Job ---
