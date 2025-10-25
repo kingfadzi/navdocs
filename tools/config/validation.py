@@ -229,11 +229,11 @@ def main():
     is_valid, errors = validate_bom(bom_file, branch_name)
 
     if is_valid:
-        print("✓ [OK] BOM is valid")
+        print("[OK] BOM is valid")
         print("  - Schema validation: PASSED")
         print("  - Governance rules: PASSED")
     else:
-        print("✗ [FAILED] BOM validation failed")
+        print("[FAILED] BOM validation failed")
         for error in errors:
             print(f"  - {error}")
 
