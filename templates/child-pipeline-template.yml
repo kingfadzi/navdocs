@@ -14,7 +14,7 @@ stages:
     - dnf install -y -q git bash openssh-clients sshpass
     - dnf module reset -y python36
     - dnf install -y -q python3.11 python3.11-pip python3.11-devel
-    - pip3.11 install PyYAML boto3 --quiet
+    - pip3.11 install -r requirements.txt --quiet
     - ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 extract:

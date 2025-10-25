@@ -11,16 +11,8 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# Import utilities - handle both direct execution and package import
-try:
-    from deployment.utils import load_yaml
-except ImportError:
-    from tools.deployment.utils import load_yaml
-
-try:
-    from storage import get_storage_backend
-except ImportError:
-    from tools.storage import get_storage_backend
+from .utils import load_yaml
+from ..storage import get_storage_backend
 
 
 def create_evidence_package(bom_file, archive_path, config):
@@ -110,91 +102,78 @@ def print_gitlab_artifact_info(archive_path, bom_file, metadata):
     print("=" * 60)
 
 
-def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, archive_path, evidence_path, config):
-    """
-    Create complete deployment snapshot and upload to S3.
-
-    Collects:
-    - Bundles from extract stage
-    - Metadata from extract stage
-    - Rollback archive
-    - Evidence package
-    - Original BOM
-    - Job logs from GitLab API
-    - SNAPSHOT_MANIFEST
-
-    Uploads to: s3://bucket/snapshots/{pipeline_id}/
-    """
-    root = Path(__file__).parent.parent.parent
+def _setup_snapshot_dir(root, pipeline_id):
+    """Setup and return snapshot directory."""
     snapshot_dir = root / "snapshot-temp" / str(pipeline_id)
-
     if snapshot_dir.exists():
         shutil.rmtree(snapshot_dir)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
+    return snapshot_dir
 
-    print("=" * 60)
-    print(f"CREATING COMPLETE SNAPSHOT (Pipeline {pipeline_id})")
-    print("=" * 60)
 
-    # 1. Collect bundles (from GitLab artifacts)
+def _copy_bundles_to_snapshot(snapshot_dir, metadata, deployment_type, root):
+    """Copy bundles and metadata to snapshot directory."""
     bundles_dir = snapshot_dir / "bundles"
     bundles_dir.mkdir(exist_ok=True)
 
     for bundle_path in metadata['bundles']:
-        # Bundles are always local paths (from GitLab artifacts)
         bundle_file = Path(bundle_path)
         if bundle_file.exists():
             shutil.copy(bundle_file, bundles_dir / bundle_file.name)
-            print(f"Copied bundle for snapshot: {bundle_file.name}")
+            print(f"Copied bundle: {bundle_file.name}")
 
-    # 2. Copy metadata
     metadata_file = root / f"bundles/{deployment_type}-metadata.yaml"
     if metadata_file.exists():
         shutil.copy(metadata_file, bundles_dir / f"{deployment_type}-metadata.yaml")
         print(f"Copied metadata: {deployment_type}-metadata.yaml")
 
-    # 3. Copy archives
+
+def _copy_artifacts_to_snapshot(snapshot_dir, archive_path, evidence_path, bom_file, root):
+    """Copy archives, evidence, BOM, and rollback manifest to snapshot."""
+    # Copy archive
     archives_dir = snapshot_dir / "archives"
     archives_dir.mkdir(exist_ok=True)
     if archive_path.exists():
         shutil.copy(archive_path, archives_dir / archive_path.name)
         print(f"Copied archive: {archive_path.name}")
 
-    # 4. Copy evidence
+    # Copy evidence
     evidence_dir = snapshot_dir / "evidence"
     evidence_dir.mkdir(exist_ok=True)
     if evidence_path.exists():
         shutil.copy(evidence_path, evidence_dir / evidence_path.name)
         print(f"Copied evidence: {evidence_path.name}")
 
-    # 5. Copy original BOM
+    # Copy BOM
     shutil.copy(bom_file, snapshot_dir / "bom.yaml")
     print(f"Copied BOM: {Path(bom_file).name}")
 
-    # 6. Copy ROLLBACK_MANIFEST if it exists (for S3 fallback during rollback)
+    # Copy ROLLBACK_MANIFEST if exists
     rollback_manifest = root / "archives" / "ROLLBACK_MANIFEST.yaml"
     if rollback_manifest.exists():
         shutil.copy(rollback_manifest, archives_dir / "ROLLBACK_MANIFEST.yaml")
-        print(f"Copied ROLLBACK_MANIFEST for S3 fallback")
+        print("Copied ROLLBACK_MANIFEST for S3 fallback")
 
-    # 7. Job logs are captured by GitLab (accessible via GitLab UI)
-    # Note: Logs are not included in snapshot - access via GitLab job logs
-    print("\nJob logs available in GitLab pipeline history")
 
-    # 8. Create SNAPSHOT_MANIFEST
+def _create_snapshot_manifest(snapshot_dir, pipeline_id, deployment_type, metadata):
+    """Create and save snapshot manifest."""
+    bundles_dir = snapshot_dir / "bundles"
+    archives_dir = snapshot_dir / "archives"
+    evidence_dir = snapshot_dir / "evidence"
+
     snapshot_manifest = {
         'snapshot_version': '1.0.0',
         'created_at': datetime.now().isoformat(),
         'pipeline_id': pipeline_id,
         'deployment_type': deployment_type,
         'snapshot_contents': {
-            'bundles': [f.name for f in bundles_dir.glob('*.xml')],
-            'metadata': [f.name for f in bundles_dir.glob('*.yaml')],
-            'archives': [f.name for f in archives_dir.glob('*')],  # Includes .zip + ROLLBACK_MANIFEST.yaml
-            'evidence': [f.name for f in evidence_dir.glob('*.zip')],
+            'bundles': [bundle_file.name for bundle_file in bundles_dir.glob('*.xml')],
+            'metadata': [metadata_file.name for metadata_file in bundles_dir.glob('*.yaml')],
+            'archives': [archive_file.name for archive_file in archives_dir.glob('*')],
+            'evidence': [evidence_file.name for evidence_file in evidence_dir.glob('*.zip')],
             'bom': 'bom.yaml'
         },
-        'note': 'Job logs available in GitLab pipeline history (not included in snapshot)',
+        'note': 'Job logs available in GitLab pipeline history',
         'git_context': {
             'commit_sha': os.environ.get('CI_COMMIT_SHA', 'local'),
             'branch': os.environ.get('CI_COMMIT_BRANCH', 'unknown'),
@@ -213,42 +192,52 @@ def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, a
     manifest_path = snapshot_dir / "SNAPSHOT_MANIFEST.yaml"
     with open(manifest_path, 'w') as f:
         yaml.dump(snapshot_manifest, f, default_flow_style=False, sort_keys=False)
+    print(f"Created SNAPSHOT_MANIFEST")
 
-    print(f"Created SNAPSHOT_MANIFEST: {manifest_path}")
 
-    # 9. Upload snapshot to S3
+def _upload_snapshot_to_s3(snapshot_dir, pipeline_id, config):
+    """Upload snapshot to S3 and cleanup."""
     storage_mode = config['deployment'].get('storage_backend', 'local')
-    s3_snapshot_url = None
 
-    if storage_mode == 's3':
-        # Get storage backend for S3 uploads
-        storage = get_storage_backend(config)
+    if storage_mode != 's3':
+        print(f"\nLocal mode: Snapshot at {snapshot_dir}")
+        return None
 
-        s3_prefix = f"snapshots/{pipeline_id}"
+    storage = get_storage_backend(config)
+    s3_prefix = f"snapshots/{pipeline_id}"
+    bucket = config['s3']['bucket_name']
 
-        print(f"\nUploading snapshot to S3: s3://{config['s3']['bucket_name']}/{s3_prefix}/")
+    print(f"\nUploading to S3: s3://{bucket}/{s3_prefix}/")
 
-        # Upload all files preserving directory structure
-        uploaded_count = 0
-        for file_path in snapshot_dir.rglob('*'):
-            if file_path.is_file():
-                relative_path = file_path.relative_to(snapshot_dir)
-                s3_key = f"{s3_prefix}/{relative_path}"
-                storage.upload_file(file_path, s3_key)
-                uploaded_count += 1
+    uploaded_count = 0
+    for file_path in snapshot_dir.rglob('*'):
+        if file_path.is_file():
+            relative_path = file_path.relative_to(snapshot_dir)
+            s3_key = f"{s3_prefix}/{relative_path}"
+            storage.upload_file(file_path, s3_key)
+            uploaded_count += 1
 
-        s3_snapshot_url = f"s3://{config['s3']['bucket_name']}/{s3_prefix}/"
-        print(f"✓ Snapshot uploaded: {s3_snapshot_url} ({uploaded_count} files)")
-    else:
-        print("\nLocal mode: Snapshot created locally (not uploaded to S3)")
-        print(f"Snapshot location: {snapshot_dir}")
+    s3_snapshot_url = f"s3://{bucket}/{s3_prefix}/"
+    print(f"[OK] Uploaded {uploaded_count} files to {s3_snapshot_url}")
 
-    # 10. Cleanup
-    if storage_mode == 's3':
-        shutil.rmtree(snapshot_dir)
-        print(f"Cleaned up temporary snapshot directory")
+    shutil.rmtree(snapshot_dir)
+    print("Cleaned up temporary directory")
+    return s3_snapshot_url
 
-    print("=" * 60)
+
+def create_complete_snapshot(pipeline_id, deployment_type, metadata, bom_file, archive_path, evidence_path, config):
+    """Create complete deployment snapshot and upload to S3."""
+    root = Path(__file__).parent.parent.parent
+
+    print(f"\n=== CREATING SNAPSHOT (Pipeline {pipeline_id}) ===\n")
+
+    snapshot_dir = _setup_snapshot_dir(root, pipeline_id)
+    _copy_bundles_to_snapshot(snapshot_dir, metadata, deployment_type, root)
+    _copy_artifacts_to_snapshot(snapshot_dir, archive_path, evidence_path, bom_file, root)
+    _create_snapshot_manifest(snapshot_dir, pipeline_id, deployment_type, metadata)
+    s3_snapshot_url = _upload_snapshot_to_s3(snapshot_dir, pipeline_id, config)
+
+    print("="*60)
     return s3_snapshot_url
 
 

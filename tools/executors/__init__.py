@@ -3,21 +3,10 @@
 Executor factory and package exports.
 """
 
-# Import executors - handle both direct execution and package import
-try:
-    from executors.local import LocalExecutor
-    from executors.remote import RemoteKMigratorExecutor
-    from executors.ssh import RemoteExecutor
-except ImportError:
-    from tools.executors.local import LocalExecutor
-    from tools.executors.remote import RemoteKMigratorExecutor
-    from tools.executors.ssh import RemoteExecutor
-
-# Import storage backend factory
-try:
-    from storage import get_storage_backend
-except ImportError:
-    from tools.storage import get_storage_backend
+from .local import LocalExecutor
+from .remote import RemoteKMigratorExecutor
+from .ssh import RemoteExecutor
+from ..storage import get_storage_backend
 
 
 def is_remote_mode(server_config, config):
@@ -29,16 +18,6 @@ def is_remote_mode(server_config, config):
 
 
 def get_executor(config, server_config):
-    """
-    Factory function to create appropriate executor.
-
-    Args:
-        config: Deployment configuration dict
-        server_config: Server configuration dict
-
-    Returns:
-        LocalExecutor or RemoteKMigratorExecutor instance
-    """
     if is_remote_mode(server_config, config):
         # Remote mode: use RemoteKMigratorExecutor with S3 storage
         storage = get_storage_backend(config)

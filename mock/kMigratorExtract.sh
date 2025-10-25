@@ -44,14 +44,16 @@ if [[ -z "$ENTITY_ID" ]]; then
   exit 1
 fi
 
+if [[ -z "$REFERENCE_CODE" ]]; then
+  echo "Error: Missing required parameter: -referenceCode" >&2
+  echo "Note: -referenceCode is MANDATORY per OpenText PPM kMigratorExtract spec" >&2
+  exit 1
+fi
+
 # Generate output filename if not provided
 if [[ -z "$FILENAME" ]]; then
   TIMESTAMP=$(date +%Y%m%d%H%M%S)
-  if [[ -n "$REFERENCE_CODE" ]]; then
-    FILENAME="./bundles/KMIGRATOR_EXTRACT_${ENTITY_ID}_${REFERENCE_CODE}_${TIMESTAMP}.xml"
-  else
-    FILENAME="./bundles/KMIGRATOR_EXTRACT_${ENTITY_ID}_${TIMESTAMP}.xml"
-  fi
+  FILENAME="./bundles/KMIGRATOR_EXTRACT_${ENTITY_ID}_${REFERENCE_CODE}_${TIMESTAMP}.xml"
 fi
 
 # Create bundles directory if it doesn't exist
@@ -64,7 +66,7 @@ if [[ -z "$QUIET" ]]; then
   echo "=========================================="
   echo "Action: $ACTION"
   echo "Entity ID: $ENTITY_ID"
-  [[ -n "$REFERENCE_CODE" ]] && echo "Reference Code: $REFERENCE_CODE" || echo "Reference Code: ALL"
+  echo "Reference Code: $REFERENCE_CODE"
   echo "Source URL: $URL"
   echo "Username: $USERNAME"
   echo ""
@@ -79,15 +81,15 @@ cat > "$FILENAME" <<EOF
 <EntityBundle>
   <Metadata>
     <EntityId>$ENTITY_ID</EntityId>
-    <ReferenceCode>${REFERENCE_CODE:-ALL}</ReferenceCode>
+    <ReferenceCode>$REFERENCE_CODE</ReferenceCode>
     <ExtractedFrom>$URL</ExtractedFrom>
     <ExtractedAt>$(date -u +%Y-%m-%dT%H:%M:%SZ)</ExtractedAt>
     <ExtractedBy>$USERNAME</ExtractedBy>
   </Metadata>
   <Entities>
     <Entity>
-      <Code>${REFERENCE_CODE:-ENTITY_$ENTITY_ID}</Code>
-      <Name>Mock Entity ${REFERENCE_CODE:-$ENTITY_ID}</Name>
+      <Code>$REFERENCE_CODE</Code>
+      <Name>Mock Entity $REFERENCE_CODE</Name>
       <Type>EntityType_$ENTITY_ID</Type>
       <Description>This is a mock entity for testing purposes</Description>
     </Entity>

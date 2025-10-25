@@ -19,7 +19,7 @@ How the GitLab pipeline executes deployments.
 File Change
     |
     v
-Validate (BOM + governance rules)
+Validate (JSON schema + governance rules)
     |
     v
 Generate (create child-pipeline.yml)

@@ -7,8 +7,8 @@ System architecture and design principles for the PPM deployment pipeline.
 ## Design Principles
 
 **Two-BOM System**
-- `baseline.yaml` - ALL infrastructure entities (Object Types, Validations, Commands)
-- `functional.yaml` - SPECIFIC business logic (Workflows, Request Types, Reports)
+- `baseline.yaml` - SPECIFIC infrastructure entities listed explicitly (Object Types, Validations, Commands)
+- `functional.yaml` - SPECIFIC business logic entities listed explicitly (Workflows, Request Types, Reports)
 
 **File-Based Triggering**
 - Pipeline detects which BOM files changed
@@ -36,39 +36,64 @@ System architecture and design principles for the PPM deployment pipeline.
 
 ### BOMs (Bill of Materials)
 
-**Baseline BOM** - Infrastructure sync
+**What BOMs define:**
+- WHAT specific entities to deploy
+- Category (baseline or functional)
+- Source and target servers
+- Validated against JSON schemas
+
+**Baseline BOM** - Specific infrastructure entities
 ```yaml
 version: "1.0"
+category: baseline
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
-# No entities list - profile defines what's deployed
+entities:
+  - id: 26
+    reference_code: "OBJ_CUSTOM_ASSET"
+    name: "Custom Asset Object Type"
+  - id: 13
+    reference_code: "VAL_PRIORITY_LEVELS"
+    name: "Priority Levels Validation"
 ```
 
-**Functional BOM** - Specific entities
+**Functional BOM** - Specific business logic entities
 ```yaml
-version: "1.0"
+version: "2.0"
+category: functional
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
 entities:
-  - entity_id: workflow
+  - id: 9
     reference_code: "WF_INCIDENT_MGMT"
-    description: "Incident workflow"
+    name: "Incident Management Workflow"
+  - id: 19
+    reference_code: "REQ_TYPE_INCIDENT"
+    name: "Incident Request Type"
 ```
 
 ### Profiles and Flag Compilation
 
+**Separation of Concerns:**
+- **BOM** = WHAT to deploy (entities list)
+- **Profile** = HOW to deploy (flags configuration)
+
 **What profiles do:**
-- Define which entity types to include
-- Control dependency handling (add missing or require baseline)
+- Define flag configuration ONLY (not entities)
+- Control replacement behavior (replace vs add_missing)
 - Compile to 25-character Y/N flag strings for kMigrator
 
+**What profiles do NOT do:**
+- Define which entities to deploy (that's in the BOM)
+- Determine entity types to extract (that's in the BOM)
+
 **Two profiles:**
-- `baseline.yaml` - Infrastructure (7 entity types, add_missing=true)
-- `functional-cd.yaml` - Business logic (15 entity types, add_missing=false)
+- `baseline.yaml` - Baseline flags (add_missing=true for drift correction)
+- `functional-cd.yaml` - Functional flags (add_missing=false for strict dependencies)
 
 **Profile structure:**
 ```yaml
@@ -103,6 +128,57 @@ python3 -m tools.config.flags functional-cd
 - Version-controlled in Git
 - Self-documenting (each flag has descriptive name)
 - Prevents typos in 25-character strings
+
+### Schema Validation
+
+**Purpose:** Validate BOM structure before deployment starts.
+
+**What it validates:**
+- BOM structure (required fields, data types)
+- Category matches profile (baseline vs functional)
+- Entity IDs are valid for the category
+- Reference codes follow naming convention (UPPERCASE_UNDERSCORE)
+- Entities list is not empty
+
+**How it works:**
+
+1. **BOM loaded** from YAML file
+2. **Category detected** (baseline or functional)
+3. **Schema selected** based on category
+   - Baseline → `schemas/bom-baseline-schema.json`
+   - Functional → `schemas/bom-functional-schema.json`
+4. **Validation runs** using JSON Schema library
+5. **Errors reported** with exact path to problem
+
+**Example validation:**
+```bash
+# Validate BOM manually
+python3 -m tools.config.validation --file boms/functional.yaml
+
+# Output (valid):
+✓ [OK] BOM is valid
+  - Schema validation: PASSED
+  - Governance rules: PASSED
+
+# Output (invalid):
+✗ [FAILED] BOM validation failed
+  - Schema validation failed at 'entities -> 0 -> reference_code':
+    'reference_code' is a required property
+```
+
+**Schema files:**
+- `bom-baseline-schema.json` - Allows entity IDs: 4, 11, 13, 26, 37, 39, 58
+- `bom-functional-schema.json` - Allows entity IDs: 9, 17, 19, 61, 470, 505, 509, 521, 522, 901, 903, 906, 907, 908, 9900
+- `entity-types.yaml` - Reference documentation for entity types
+
+**Benefits:**
+- Catches errors BEFORE deployment starts
+- Validates entity IDs match category
+- Enforces mandatory fields (category, referenceCode)
+- Prevents invalid reference code formats
+- Industry-standard JSON Schema format
+
+**See also:** [schemas/README.md](schemas/README.md) for complete validation guide
 
 ### Pipeline
 

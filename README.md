@@ -11,8 +11,8 @@ Git-driven deployment pipeline for OpenText PPM. Edit BOM files, commit, deploy 
 3. Pipeline validates and deploys automatically
 
 **Two deployment types:**
-- **Baseline** - ALL foundational entities (Object Types, Request Header Types, Validations, User Data Contexts, Special Commands, Environments, Environment Groups)
-- **Functional** - SPECIFIC entities (Workflows, Request Types, Reports, Overview Pages, Dashboards, Portlets, Work Plans, Project/Program/Portfolio Types, OData Sources, Custom Menus, Chatbot Intents, PPM SDK)
+- **Baseline** - SPECIFIC foundational entities listed in BOM (Object Types, Request Header Types, Validations, User Data Contexts, Special Commands, Environments, Environment Groups)
+- **Functional** - SPECIFIC business logic entities listed in BOM (Workflows, Request Types, Reports, Overview Pages, Dashboards, Portlets, Work Plans, Project/Program/Portfolio Types, OData Sources, Custom Menus, Chatbot Intents, PPM SDK)
 
 ---
 
@@ -23,23 +23,35 @@ Git-driven deployment pipeline for OpenText PPM. Edit BOM files, commit, deploy 
 **Baseline** (`boms/baseline.yaml`):
 ```yaml
 version: "1.0"
+category: baseline
 profile: baseline
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
+entities:
+  - id: 26
+    reference_code: "OBJ_CUSTOM_ASSET"
+    name: "Custom Asset Object Type"
+  - id: 13
+    reference_code: "VAL_PRIORITY_LEVELS"
+    name: "Priority Levels Validation"
 ```
 
 **Functional** (`boms/functional.yaml`):
 ```yaml
-version: "1.0"
+version: "2.0"
+category: functional
 profile: functional-cd
 source_server: dev-ppm-useast
 target_server: test-ppm-useast
 change_request: "CR-12345"
 entities:
-  - entity_id: workflow
+  - id: 9
     reference_code: "WF_INCIDENT_MGMT"
-    description: "Incident workflow"
+    name: "Incident Management Workflow"
+  - id: 19
+    reference_code: "REQ_TYPE_INCIDENT"
+    name: "Incident Request Type"
 ```
 
 ### Deploy
@@ -58,21 +70,23 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 
 ## Repository Structure
 
-```
-.
-- boms/
-  - baseline.yaml              # Baseline deployment BOM
-  - functional.yaml            # Functional deployment BOM
-- config/
-  - deployment-config.yaml     # Server/storage config
-  - rules.yaml                 # Governance rules
-- profiles/
-  - baseline.yaml              # Baseline flags
-  - functional-cd.yaml         # Functional flags
-- tools/                         # Python deployment system
-- templates/                     # CI/CD templates
-- .gitlab-ci.yml                # Main pipeline
-```
+- **boms/** - Bill of Materials (WHAT to deploy)
+  - `baseline.yaml` - Baseline deployment BOM
+  - `functional.yaml` - Functional deployment BOM
+- **config/** - Configuration files
+  - `deployment-config.yaml` - Server/storage config
+  - `rules.yaml` - Governance rules
+- **profiles/** - Deployment profiles (HOW to deploy)
+  - `baseline.yaml` - Baseline flags configuration
+  - `functional-cd.yaml` - Functional flags configuration
+- **schemas/** - BOM validation schemas
+  - `bom-baseline-schema.json` - Baseline BOM validation schema
+  - `bom-functional-schema.json` - Functional BOM validation schema
+  - `entity-types.yaml` - Entity type reference
+  - `README.md` - Schema documentation
+- **tools/** - Python deployment system
+- **templates/** - CI/CD pipeline templates
+- `.gitlab-ci.yml` - Main pipeline configuration
 
 ---
 
@@ -85,7 +99,7 @@ See [MANUAL_DEPLOYMENT_GUIDE.md](MANUAL_DEPLOYMENT_GUIDE.md)
 | Both files | Baseline first, then functional |
 
 **Stages:**
-1. **Validate** - Check BOM against governance rules
+1. **Validate** - JSON schema validation + governance rules
 2. **Extract** - Pull entities from source server
 3. **Import** - Push entities to target server
 4. **Archive** - Create rollback package
