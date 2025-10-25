@@ -30,7 +30,7 @@ vault_component_providers:
   # BREAKING CHANGE: Renamed parameters (vault_role → csm_role, vault_secret_paths → csm_secret_urls)
   csm:
     component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
-    component_version: "v2.0.0"
+    component_version: "2.0.0"
     parameter_mappings:
       anchor_name: "anchor_name"
       role: "csm_role"               # CSM uses 'csm_role' instead of 'vault_role'
