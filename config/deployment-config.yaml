@@ -7,15 +7,11 @@ kmigrator:
   extract_script: "/opt/ppm/bin/kMigratorExtract.sh"
   import_script: "/opt/ppm/bin/kMigratorImport.sh"
 
-# Deployment settings
 deployment:
   bundle_dir: "./bundles"
   archive_dir: "./archives"
   storage_backend: "s3"  # S3 storage (bundles go directly: PPM → S3 → PPM)
 
-# CSM Vault Secret Fetcher Component
-# This system uses OpenText CSM vault component exclusively for secret management.
-# Component parameters: anchor_name, csm_role, csm_secret_urls
 csm:
   component_url: "eros.butterflycluster.com/staging/vault-secret-fetcher/vault-retrieve"
   component_version: "2.0.0"
@@ -28,17 +24,6 @@ s3:
   vault_roles:
     - name: s3-read
       path: secret/data/shared/s3
-
-# PPM Server Registry with SSH configuration for remote execution
-# Credentials injected from GitLab CI/CD environment variables (via Vault):
-#
-# SSH credentials (vault: secret/data/infrastructure/ssh/{server}):
-#   - SSH_USERNAME: OS-level user for SSH/SCP access to remote servers
-#   - SSH_PASSWORD: Password for SSH authentication
-#
-# PPM credentials (vault: secret/data/ppm/{env}/useast):
-#   - PPM_ADMIN_USER: PPM service account username for kMigrator/API operations
-#   - PPM_SERVICE_ACCOUNT_PASSWORD: PPM service account password
 
 servers:
   dev-ppm-useast:
