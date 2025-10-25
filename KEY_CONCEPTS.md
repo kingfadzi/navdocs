@@ -265,11 +265,12 @@ else:
 
 ---
 
-## Secret Management
+## Secret Management (CSM)
 
-**Central Secrets Manager Integration**
-- GitLab CI components fetch secrets automatically
-- Export as environment variables
+**OpenText CSM Integration**
+This system uses CSM (Central Secrets Manager) exclusively for credential management.
+- CSM vault component fetches secrets automatically via GitLab CI
+- Exports as environment variables
 - No credentials in code or config
 
 **Per-server secrets configuration:**
@@ -288,16 +289,16 @@ servers:
 ```
 
 **Variable names are configurable:**
-- Variable names depend on the secrets manager in use
+- Variable names exported by CSM vault component
 - Defined in `deployment-config.yaml` per server (`ssh_env_vars`, `ppm_api_env_vars`)
 - Deployment tools read variable names from config, not hardcoded
 - Example above shows one possible configuration
 
 **Pipeline workflow:**
-1. Secrets manager fetches credentials from configured paths
+1. CSM vault component fetches credentials from configured paths
 2. Exports as environment variables (names defined in config)
 3. Deployment tools read variables specified in config
-4. Secrets cleared after job
+4. Secrets cleared after job completion
 
 ---
 
@@ -474,7 +475,7 @@ export PPM_ADMIN_PASSWORD=testpass
 **Remote mode:**
 ```bash
 # Don't set DEPLOYMENT_ENV
-# All credentials injected by Central Secrets Manager in pipeline
+# All credentials injected by CSM vault component in pipeline
 # For manual CLI: export the variables defined in deployment-config.yaml
 # Example (default config): SSH_USERNAME, SSH_PASSWORD, PPM_ADMIN_USER, PPM_ADMIN_PASSWORD
 ```
