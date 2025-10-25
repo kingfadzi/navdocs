@@ -90,10 +90,12 @@ The kMigratorImport script imports PPM entity XML bundles into a target environm
 
 | **Value** | **Description** |
 | --- | --- |
-| `nochange` | Do not modify reference data tables (recommended) |
-| `install` | Install/update reference data from bundle (use with caution) |
+| `nochange` | Do not modify reference data tables |
+| `install` | Install/update reference data from bundle |
 
-**Recommendation:** Use `nochange` unless explicitly installing reference data updates.
+**Our system uses:**
+- **Baseline deployments:** `refdata=install` (syncs reference data tables)
+- **Functional deployments:** `refdata=nochange` (business logic only, no system changes)
 
 ### Optional Parameters
 
@@ -126,7 +128,7 @@ sh ./kMigratorImport.sh \
   -action trial \
   -filename '/tmp/baseline_entities.xml' \
   -i18n none \
-  -refdata nochange \
+  -refdata install \
   -flags YYYYYNNNNYYYNYYYYNNNNNNN
 ```
 
@@ -198,10 +200,12 @@ Our deployment system uses two standard flag profiles defined in `profiles/`:
 - **Baseline:** Deploys 7 infrastructure entities (Object Types, Validations, Environments, etc.)
   - Flag string: `YNYYYNNNNYYYNYNNNNNNNNNNNN`
   - Add missing operations enabled (drift correction)
+  - Import: `i18n=none`, `refdata=install` (syncs reference data)
 
 - **Functional-CD:** Deploys 15 business logic entities (Workflows, Reports, Dashboards, etc.)
   - Flag string: `NYNNNYYYYNNNYNYYYYYYYYYYY`
   - Add missing operations disabled (strict dependencies)
+  - Import: `i18n=charset`, `refdata=nochange` (business logic only)
 
 See `profiles/baseline.yaml` and `profiles/functional-cd.yaml` for source configuration.
 
@@ -273,8 +277,10 @@ python3 -m tools.deployment.orchestrator deploy \
   --bom boms/baseline.yaml
 
 # Flags used: YNYYYNNNNYYYNYYYYNNNNNNN
+# Import: i18n=none, refdata=install
 # - Replaces all baseline entities
 # - Adds missing environments, security groups, statuses
+# - Updates reference data tables
 
 # Step 2: Deploy functional entities
 python3 -m tools.deployment.orchestrator deploy \
@@ -282,8 +288,10 @@ python3 -m tools.deployment.orchestrator deploy \
   --bom boms/functional.yaml
 
 # Flags used: NYNNNYYYYNNNYNYYYYYYYYYYN
+# Import: i18n=charset, refdata=nochange
 # - Replaces functional entities only
 # - Does NOT add missing baseline items (already exist)
+# - Does NOT modify reference data (business logic only)
 ```
 
 ### Scenario 2: Continuous Deployment (Aligned Environments)
@@ -297,9 +305,11 @@ python3 -m tools.deployment.orchestrator deploy \
   --bom boms/functional.yaml
 
 # Flags used: NYNNNYYYYNNNYNYYYYYYYYYYN
+# Import: i18n=charset, refdata=nochange
 # - Replaces workflows, request types, reports, dashboards
 # - Does NOT touch baseline entities
 # - Does NOT add missing items (enforces baseline alignment)
+# - Does NOT modify reference data
 ```
 
 ### Scenario 3: Baseline Realignment
@@ -313,8 +323,10 @@ python3 -m tools.deployment.orchestrator deploy \
   --bom boms/baseline.yaml
 
 # Flags used: YNYYYNNNNNNNNYYYYNNNNNNN
+# Import: i18n=none, refdata=install
 # - Replaces all baseline entities
 # - Does NOT add missing items (detects drift instead)
+# - Updates reference data tables
 # - Missing environments/statuses = signal of upstream drift
 ```
 

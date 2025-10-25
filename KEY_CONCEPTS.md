@@ -443,12 +443,14 @@ deployment_metadata:
 **Baseline Deployment** (infrastructure sync)
 - Deploys ALL 7 baseline entity types
 - Add missing dependencies (drift correction)
+- Updates reference data tables (`refdata=install`)
 - High risk - affects all downstream entities
 - Quarterly or as-needed
 
 **Functional Deployment** (business logic)
 - Deploys ONLY entities listed in BOM
 - Requires baseline to exist
+- Does NOT modify reference data (`refdata=nochange`)
 - Medium risk - isolated to specific entities
 - Weekly or sprint-based
 
