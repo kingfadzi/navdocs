@@ -60,9 +60,9 @@
 2. **Then:** Deploy functional entities that reference the baseline
 
 **Example dependency chain:**
-- Workflows (functional) → reference Environments (baseline)
-- Request Types (functional) → reference Validations (baseline)
-- Reports (functional) → reference Object Types (baseline)
+- Workflows (functional) -> reference Environments (baseline)
+- Request Types (functional) -> reference Validations (baseline)
+- Reports (functional) -> reference Object Types (baseline)
 
 Attempting to deploy functional entities before baseline will result in import failures due to missing dependencies.
 
